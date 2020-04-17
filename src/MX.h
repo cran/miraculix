@@ -45,49 +45,26 @@ typedef unsigned int Uint;
 typedef uint64_t Ulong;
 typedef int64_t Long;
 
-extern bool debugging, PRESERVE;
+extern bool debugging;
 extern Rint PL, CORES;
 extern SEXP Information, Method, Coding; // READONLY !!!!
 
-SEXP CreateEmptyCodeVectorALL(Uint snps, Uint individuals,
-			      Uint memInUnitsPerIndiv, 
-			      Uint bytesPerBlock, Uint bitsPerCode,
-			      Uint codesperblock, bool haplo);
 
-void ReUseAsX(SEXP Code, snpcoding method,
-	      Uint snps, Uint individuals,
-	      Uint memInUnitsPerIndiv, 
-	      Uint bytesPerBlock, Uint bitsPerCode,
-	      Uint codesperblock, bool haplo);
- 
-#define CreateEmptyCodeVector(snps, individuals, memInUnitsPerIndiv)	\
-  CreateEmptyCodeVectorALL(snps, individuals, memInUnitsPerIndiv,	\
-			     BytesPerBlock, BitsPerCode, CodesPerBlock, false);
-#define CreateEmptyCodeVectorHaplo(snps, individuals, memInUnitsPerIndiv) \
-  CreateEmptyCodeVectorALL(snps, individuals, memInUnitsPerIndiv, 	\
- 			     BytesPerBlock, BitsPerCode, CodesPerBlock, true);
-
-#define InternReUseAs(Code,method,snps,individuals,memInUnitsPerIndiv, haplo) \
-  ReUseAsX(Code, method, snps, individuals, memInUnitsPerIndiv,		\
-	   BytesPerBlock, BitsPerCode, CodesPerBlock, haplo);
-
-
-void start_info(SEXP Code, SEXP file, Uint unitsperblock, Uint codesperblock);
 
 // #define GetInfo(M) (Uint *) INTEGER(getAttrib(M, Information))
 // OBIGES WAERE DAS RICHTIGE, ABER ALTES FORMAT EXISTIERT NOCH:
 Uint *GetInfo(SEXP M);
-#define MethodOf(M) INTEGER(getAttrib(M, Method))[0]
+
 #define ClassOf(M) INTEGER(getAttrib(M, Class))[0]
 
 #define SumGeno(info)							\
     ((Ulong) info[SUMGENO] +(uint64_t) info[SUMGENO_E9] * (Ulong) 1000000000)
-#define StoreSumGeno(X) {					\
+
+#define StoreSumGeno(X) {				\
     Ulong GenoSum = X;					\
     info[SUMGENO] = GenoSum % (uint64_t) 1000000000;	\
     info[SUMGENO_E9] = GenoSum / (uint64_t) 1000000000;	\
   }
-
 
 #define MemInUnits(info)						\
   ((Ulong) info[MEMinUNITS0] +(uint64_t) info[MEMinUNITS1] * (Ulong) 1000000000)
@@ -100,6 +77,7 @@ Uint *GetInfo(SEXP M);
 
 #define AlignedInUnits(info)						\
   ((Ulong) info[ALIGNEDUNITS0] +(uint64_t) info[ALIGNEDUNITS1] * (Ulong) 1000000000)
+
 #define StoreAlignedInUnits(X) {					\
     Ulong memX = X;					\
     info[ALIGNEDUNITS0] = memX % (uint64_t) 1000000000;	\
@@ -114,11 +92,12 @@ Uint *GetInfo(SEXP M);
 #define MaxUnitsPerAddress 2L
 #define UnitsPerAddress (1L + (sizeof(Uint *) - 1L) / BytesPerUnit)
 
-typedef union addr_Uint{
+
+union addr_Uint{
   Rint * a;
   Uint u[UnitsPerAddress];
   uint8_t bbbb_CXXb[2 * sizeof(Uint*)]; // nur zum testen
-} addr_Uint;
+};
 
 
 
@@ -133,12 +112,11 @@ typedef union addr_Uint{
 
 #define ALIGN_23 ALIGN_CODED
 #define ALIGN_SSE ALIGN_CODED
+#define ALIGN_SHUFFLE ALIGN_CODED // muss identisch zu ALIGN_23 sein !
 
 #define algn_general(X, bytesperblock)  ((1L + (uintptr_t) (((uintptr_t) X - 1L) / bytesperblock)) * bytesperblock) // ok!!
 
-
-
-
+								       
 	  
 #define ADDADDRESS(WHICH, WHERE)	{				\
     addr_Uint addalign;							\
@@ -150,12 +128,30 @@ typedef union addr_Uint{
 
 Rint* GetAddress(Uint *info, Uint where);
 
-
 Uint Inti(SEXP X, Uint i);
 #define Int0(X) Inti(X, 0L)
 
 
 #define HELPINFO(M) if (GLOBAL_UTILS->basic.helpinfo) PRINTF("%s\n(Note that you can unable this information by 'RFoptions(helpinfo=FALSE)'.)\n", M) //
 
+#define isGeno(method) ((method) < Haplo)
+
+Uint *GetInfoUnchecked(SEXP Code);
+
+			
+#define BytesPerBlock256 32L
+#define UnitsPerBlock256 (BytesPerBlock256 / BytesPerUnit)
+#define BitsPerCode256 2
+#define CodesPerUnit256 (BytesPerUnit * BitsPerByte / BitsPerCode256)
+#define CodesPerBlock256 (CodesPerUnit256 * UnitsPerBlock256)
+#define is256(method) (((method) >= FirstMoBPSmethod && (method) <= LastMoBPSmethod) || (method) == Haplo)
+
+long static inline Blocks256(Ulong snps){    
+  return 1L + (snps - 1L) / CodesPerBlock256;
+}
+
+long static inline UnitsPerIndiv256(Ulong snps){    
+  return Blocks256(snps) * UnitsPerBlock256;
+}
 
 #endif

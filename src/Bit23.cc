@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // gcc -mavx -o hello_avx hello_avx.c
 
-#include "AutoMiraculix.h"
 #include "Bit23.intern.h"
-//#include "haplogeno.h"
 
 
 void initiate_tableI(table_type **TABLE, Uint TABLESIZE,
@@ -35,22 +33,23 @@ void initiate_tableI(table_type **TABLE, Uint TABLESIZE,
 		     Uint *result_value, Uint NrResults) { // hash table
 
   Uint d,
-    *nx;
-  nx = (Uint *) CALLOC(codesPerMiniblock, sizeof(Uint));
+    *nx = (Uint *) CALLOC(codesPerMiniblock, sizeof(Uint));
   
   *TABLE = (table_type*) CALLOC(TABLESIZE, sizeof(table_type));
-   table_type* table = *TABLE;
+  table_type* table = *TABLE;
 
   while (true) {
-    BlockType value = 0;
-    Uint shift,
+      Uint value = 0,
+      shift,
       sum = 0;
     
     for (d=shift=0; d<codesPerMiniblock; d++, shift+=bitsPerCode) {
       value |= result_code[nx[d]] << shift;
+      //    printf("sh=%d ",shift);
       sum += result_value[nx[d]];
     }
-      
+
+       
     assert(value < TABLESIZE && table[value] == 0);
     table[value] = sum;
     d = 0;
@@ -65,28 +64,7 @@ void initiate_tableI(table_type **TABLE, Uint TABLESIZE,
   FREE(nx);
 }
 
-
-
-
-
-
-
-SEXP matrix_coding23(Uint *M, Uint snps, Uint individuals, snpcoding method){
-  SEXP Code;
- 
-  if (method == TwoBit) {
-    PROTECT(Code = matrix_coding_start2(individuals, snps, R_NilValue));
-    matrix_coding2(M, 0, individuals, 0, snps, snps, Code, NULL);
-  } else if (method == ThreeBit) {
-    PROTECT(Code = matrix_coding_start3(individuals, snps, R_NilValue));
-    matrix_coding3(M, 0, individuals, 0, snps, snps, Code, NULL);
-  } else BUG;
-
-  UNPROTECT(1);
-  return Code;
-}
-
-SEXP get_matrix23_start(Uint individuals, Uint snps,
+SEXP get_matrix23_start(Uint snps, Uint individuals, 
 		      SEXP VARIABLE_IS_NOT_USED G) {
   SEXP Ans;
   PROTECT(Ans=allocMatrix(INTSXP, snps, individuals));
@@ -96,7 +74,7 @@ SEXP get_matrix23_start(Uint individuals, Uint snps,
 
 
 void printbits(BlockType0 x, Uint size, Uint bitsPerCode) {
-  BlockType mask = INT64_C(1);  
+  BlockType mask = UINT64_C(1);  
   for (Uint d=0, zaehler=0; d<size; d++) {
     if (zaehler++ == bitsPerCode) {
       PRINTF(".");

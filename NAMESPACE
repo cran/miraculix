@@ -8,12 +8,20 @@ export(
     "has.instruction.set",
     "vector012matrix", "matrixvector012",
     ##
-    Shuffle, TwoBit, ThreeBit, Hamming2, Hamming3, AutoCoding, NoSNPcoding,
-       
+    AutoCoding, NoSNPcoding, NoSNPcodingR, NoSNPcodingAVX,
+    Shuffle, Shuffle256, TwoBit, ThreeBit, Hamming2, Hamming3,
+    Packed, Packed256, Multiply, Multiply256,
+
+    SNPCODING_NAMES,
+    FirstMoBPSmethod, 
+    LastMoBPSmethod,
+    FirstGenuineMethod,
+    LastGenuineMethod,
+    
     "windower",
     "scanning", "scan.statistics",
 
-    "genomicmatrix", "haplomatrix", "rhaplo",
+    "genomicmatrix", "haplomatrix", "rhaplo", "as.genomicmatrix",
     
     "zeroNthGeno","fillGeno", "copyGeno",
 

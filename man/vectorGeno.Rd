@@ -22,9 +22,13 @@ genoVector(SNPxIndiv, V, do.centering=FALSE)
   \item{do.centering}{not programmed yet.}
 
   \item{decode}{Logical. This option only applies when
-    \code{\link{RFoptions}()$genetics$snpcoding == Shuffle}.
+    \code{\link{RFoptions}()$genetics$snpcoding} equals
+    \code{Shuffle256}, \code{Shuffle}, \code{Packed256}, \code{Packed},
+    \code{Multiply}, 
+    or \code{TwoBit}.
     If \code{TRUE} the matrix is  decoded and
-    standard matrix multiplication performed afterwards. This is faster than
+    standard matrix multiplication performed afterwards.
+    This is currently faster than
     to operate on the coded version (\code{decode}=FALSE), but takes
     (considerably) more memory.
   }
@@ -34,21 +38,21 @@ genoVector(SNPxIndiv, V, do.centering=FALSE)
 
 
 \details{
-  Let $G$ be the (original) \eqn{SNP\times Indiv} matrix.
+  Let \eqn{G} be a (SNP\eqn{\times} Indiv) matrix.
   \command{vectorGeno} and \command{genoVector} return \eqn{VG} and
   \eqn{GV}, respectively.
 }
 
 \value{
-  vector of length \code{nrow(CG_SNPxIndiv)} and
-  \code{ncol(CG_SNPxIndiv)}
+  vector of length \code{nrow(SNPxIndiv)} and
+  \code{ncol(SNPxIndiv)}
   for \command{vectorGeno} and \command{genoVector}, respectively.
 }
 
 
 \author{\martin}
 
-\examples{ %   library(miraculix)
+\examples{ %   library(miraculix); RFoptions(cores=1)
 require(RandomFieldsUtils)
 set.seed(0)
 
@@ -67,7 +71,7 @@ stopifnot(all.equal(as.double(VM), as.double(VM1)))
 
 ## G %*% V
 Vr <- runif(indiv)
-print(system.time(MV1 <- genoVector(CM, Vr))) ## 4x faster than '%*%'
+print(system.time(MV1 <- genoVector(CM, Vr))) ## 3x faster than '%*%'
 print(system.time(MV <- as.vector(M \%*\% Vr)))
 stopifnot(all.equal(as.double(MV), as.double(MV1)))
 }

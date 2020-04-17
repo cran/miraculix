@@ -23,35 +23,60 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define AutoMiraculix_H 1
 #include <R.h>
 
-typedef enum snpcoding {Shuffle,  // SSE2 or AVX needed, 0
-			TwoBit,   // none needed
-			ThreeBit, // none needed, 2
-			Hamming2, // SSE2
-			Hamming3, // SSE3, 4
-			NoSNPcoding, // 5
-			NoSNPcodingR, // 6
-			AutoCoding,  // 
-			Haplo
+typedef enum snpcoding {AutoCoding,  // 0
+			NoSNPcodingR, // none needed, 1
+			NoSNPcodingAVX, // none needed, 2
+			NoSNPcoding, // none needed, 3
+			ThreeBit, // none needed, 4
+			Hamming2, // SSE2 5
+			Hamming3, // SSSE3, 6
+			Shuffle,  // SSE2 7
+			Shuffle256, // or AVX 8
+			TwoBit,   // none needed 9
+			Packed,  // 10
+			Packed256, // 11
+			Multiply, // 12
+			Multiply256, //13
+			CaseCount, // ab AVX512
+			unused14, 
+			unused15, 
+			unused16, 
+			unused17, 
+			unused18, 
+			unused19,
+			unused20,
+			unused21,
+			unused22,
+			unused23,
+			unused24,
+			unused25,
+			unused26,
+			unused27,
+			unused28,
+			unused29,
+			Haplo, // 30; see MX.h! before changing!!
+			UnknownSNPcoding // 31
 } snpcoding;
 
-#define last_usr_meth AutoCoding // DO NEVER CHANGE
-#define nr_snpcoding (Haplo + 1)
+#define nr_snpcoding (UnknownSNPcoding + 1)
+#define FirstMoBPSmethod Shuffle
+#define LastMoBPSmethod Multiply256
+#define FirstGenuineMethod NoSNPcoding
+#define LastGenuineMethod LastMoBPSmethod
 
 
 // WHAT just doubles the information that is also available through
 // the class information, but easier to access on the C level for
 // historical reasons. To be deleted maybe somewhen.
-#define HAPLO 0
-// #define GENO 1
-#define GENOMATRIX 1
-#define LAST_WHAT 1
 
 
 // Coding of the attribute "information"
 // !!!! ACHTUNG ZAHLEN MUESSEN DIE GLEICHEN BLEIBEN !!!!
 
-#define WHAT 0
-#define SNPS 1  // Wert darf auf keinen Fall geaendert werden
+#define CURRENT_VERSION 2
+
+#define VERSION 0
+#define SNPS 1 // Wert darf auf keinen Fall geaendert werden
 #define INDIVIDUALS 2 // Wert darf auf keinen Fall geaendert werden
 #define ADDR0 3
 #define ADDR1 4 // Achtung! Zweiter Teil von ADDR !!
@@ -59,9 +84,9 @@ typedef enum snpcoding {Shuffle,  // SSE2 or AVX needed, 0
 #define ALIGNADDR1 6
 #define SUMGENO 7
 #define SUMGENO_E9 8
-//#define MEMinUNITS1 9  //   unused !
-// #define INFO_BLOCKS 11 // unsused !
-#define SNPxIND 10 // INFO_INDIV_PER_COL, i.e. 'percolumn'
+#define METHOD 9
+#define ALIGNMENT 10
+#define SNPxIND 11 // INFO_INDIV_PER_COL, i.e. 'percolumn'
 #define BITSPERCODE 12
 #define BYTESPERBLOCK 13
 #define CODESPERBLOCK 14
@@ -74,14 +99,17 @@ typedef enum snpcoding {Shuffle,  // SSE2 or AVX needed, 0
 #define ALIGNEDUNITS0 20  // memory needed including alignment
 #define ALIGNEDUNITS1 21
 // ACHTUNG: gegebenenfalls haplogeno.cc:copyGeno aendern!!
-#define INFO_LAST ALIGNEDUNITS1
+#define UNITSPERINDIV 22
+
+#define INFO_GENUINELY_LAST UNITSPERINDIV
+#define INFO_LAST 63
+
+#define CURRENT_SNPS HEADER // used in MOBPS, which doesn't use HEADER
 
 #define GENOMICMATRIX "genomicmatrix"
 #define HAPLOMATRIX "haplomatrix"
 #define ORIGINVECTOR "origindata"
 
-
-extern const char *SNPCODING_NAME[nr_snpcoding],
-  *WHAT_NAMES[LAST_WHAT + 1];
-
+extern const char *SNPCODING_NAMES[nr_snpcoding],
+  *INFO_NAMES[INFO_LAST + 1];
 #endif

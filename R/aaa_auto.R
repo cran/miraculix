@@ -22,26 +22,50 @@
 
  AutoMiraculix_H 	<- as.integer(1)
 
- Shuffle 	<- as.integer(0)
- TwoBit 	<- as.integer(1)
- ThreeBit 	<- as.integer(2)
- Hamming2 	<- as.integer(3)
- Hamming3 	<- as.integer(4)
- NoSNPcoding 	<- as.integer(5)
- NoSNPcodingR 	<- as.integer(6)
- AutoCoding 	<- as.integer(7)
- Haplo 	<- as.integer(8)
+ AutoCoding 	<- as.integer(0)
+ NoSNPcodingR 	<- as.integer(1)
+ NoSNPcodingAVX 	<- as.integer(2)
+ NoSNPcoding 	<- as.integer(3)
+ ThreeBit 	<- as.integer(4)
+ Hamming2 	<- as.integer(5)
+ Hamming3 	<- as.integer(6)
+ Shuffle 	<- as.integer(7)
+ Shuffle256 	<- as.integer(8)
+ TwoBit 	<- as.integer(9)
+ Packed 	<- as.integer(10)
+ Packed256 	<- as.integer(11)
+ Multiply 	<- as.integer(12)
+ Multiply256 	<- as.integer(13)
+ CaseCount 	<- as.integer(14)
+ unused14 	<- as.integer(15)
+ unused15 	<- as.integer(16)
+ unused16 	<- as.integer(17)
+ unused17 	<- as.integer(18)
+ unused18 	<- as.integer(19)
+ unused19 	<- as.integer(20)
+ unused20 	<- as.integer(21)
+ unused21 	<- as.integer(22)
+ unused22 	<- as.integer(23)
+ unused23 	<- as.integer(24)
+ unused24 	<- as.integer(25)
+ unused25 	<- as.integer(26)
+ unused26 	<- as.integer(27)
+ unused27 	<- as.integer(28)
+ unused28 	<- as.integer(29)
+ unused29 	<- as.integer(30)
+ Haplo 	<- as.integer(31)
+ UnknownSNPcoding 	<- as.integer(32)
 
 
- last_usr_meth 	<- as.integer(AutoCoding)
- nr_snpcoding 	<- as.integer((Haplo+1))
+ nr_snpcoding 	<- as.integer((UnknownSNPcoding+1))
+ FirstMoBPSmethod 	<- as.integer(Shuffle)
+ LastMoBPSmethod 	<- as.integer(Multiply256)
+ FirstGenuineMethod 	<- as.integer(NoSNPcoding)
+ LastGenuineMethod 	<- as.integer(LastMoBPSmethod)
 
- HAPLO 	<- as.integer(0)
+ CURRENT_VERSION 	<- as.integer(2)
 
- GENOMATRIX 	<- as.integer(1)
- LAST_WHAT 	<- as.integer(1)
-
- WHAT 	<- as.integer(0)
+ VERSION 	<- as.integer(0)
  SNPS 	<- as.integer(1)
  INDIVIDUALS 	<- as.integer(2)
  ADDR0 	<- as.integer(3)
@@ -50,8 +74,9 @@
  ALIGNADDR1 	<- as.integer(6)
  SUMGENO 	<- as.integer(7)
  SUMGENO_E9 	<- as.integer(8)
-
- SNPxIND 	<- as.integer(10)
+ METHOD 	<- as.integer(9)
+ ALIGNMENT 	<- as.integer(10)
+ SNPxIND 	<- as.integer(11)
  BITSPERCODE 	<- as.integer(12)
  BYTESPERBLOCK 	<- as.integer(13)
  CODESPERBLOCK 	<- as.integer(14)
@@ -64,7 +89,12 @@
  ALIGNEDUNITS0 	<- as.integer(20)
  ALIGNEDUNITS1 	<- as.integer(21)
 
- INFO_LAST 	<- as.integer(ALIGNEDUNITS1)
+ UNITSPERINDIV 	<- as.integer(22)
+
+ INFO_GENUINELY_LAST 	<- as.integer(UNITSPERINDIV)
+ INFO_LAST 	<- as.integer(63)
+
+ CURRENT_SNPS 	<- as.integer(HEADER)
 
  GENOMICMATRIX 	<- "genomicmatrix"
  HAPLOMATRIX 	<- "haplomatrix"
@@ -74,10 +104,10 @@
 
  ## from  src/AutoMiraculix.cc
 
- SNPCODING_NAME <-
-c( "Shuffle","TwoBit","ThreeBit","Hamming2","Hamming3","NoSNPcoding","NoSNPcodingR","AutoCoding","Haplo" )
+ SNPCODING_NAMES <-
+c( "AutoCoding","NoSNPcodingR","NoSNPCodingAVX","NoSNPcoding","ThreeBit","Hamming2","Hamming3","Shuffle","Shuffle256","TwoBit","Packed","Packed256","Multiply","Multiply256","CaseCount","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","Haplo","unknown" )
 
 
- WHAT_NAMES <-
-c( "haplo vector","geno matrix" )
+ INFO_NAMES <-
+c( "version","snps","individuals","addr0","addr1","align0","align1","sumgeno","sumgenoE9","method","alignment","isSNPxInd","bitspercode","bytesperblock","codesperblock","header","DoubledIndividuals","leadingcolumns","memInUnits0","meminUnits1","AlignedUnits0","AlignedUnits1","unitsperindiv","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused","unused" )
 

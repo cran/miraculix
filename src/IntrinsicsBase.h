@@ -24,40 +24,36 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_IntrinsicsBase_H
 #define miraculix_IntrinsicsBase_H 1
 
-//#if not defined _WIN32
+//#if !defined _WIN32
+#if defined AVX512
+#undef AVX512
+#endif
 
 #if defined __AVX2__
 #define AVX2 1
 #endif
-#if defined __AVX__
-#define AVX 1
+#if defined __AVX__ 
+//#define AVX 1
 #endif
 #if defined __SSE41__ 
-#define SSE412 1
+//#define SSE41 1
 #endif
 #if defined  __SSE4A__
-#define SSE4A 1
+//#define SSE4A 1
 #endif
-#if defined  __SSSE3__ 
+#if defined  __SSSE3__  // needs SSE2 as well
 #define SSSE3 1
 #endif
-#if defined  __SSE3__ 
-#define SSE3 1
+#if defined  __SSE3__
+//#define SSE3 1
 #endif
 #if defined  __SSE2__ 
 #define SSE2 1 
 #endif
 #if defined __SSE__ 
-#define SSE 1
+//#define SSE 1
 #endif
 
-//#endif // not WIN32
-
-
-#if defined __MMX__ 
-#define MMX 1
-#endif
-
-
+// #endif // not WIN32
 
 #endif

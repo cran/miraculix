@@ -29,29 +29,29 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <Basic_utils.h>
 #include "AutoMiraculix.h"
 
-#define geneticsN 5
-typedef struct genetics_param {
-  bool normalized, returnsigma;
+#define geneticsN 6
+struct genetics_param {
+  bool normalized, returnsigma, any2bit;
   usr_bool centered;
   double digits;
   Rint method;
   // internal:
   double *pcentered;
   Rint ncentered;
-} genetics_param;
+};
 
 #define genetics_START {			\
-    true, false,				\
+    true, false, false,				\
       True,					\
-      3.0,					\
+      3.0,						\
       (int) getAutoCodingIntern(),			\
       NULL, 0 /* internal */			\
 }
 
 
-typedef struct globalparam {
+struct globalparam {
   genetics_param genetics;
-} globalparam;
+};
 extern globalparam GLOBAL;
 
 #define prefixN 1

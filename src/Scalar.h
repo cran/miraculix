@@ -28,15 +28,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define miraculix_ScalarInt_H 1
 
 #include "MX.h"
+#include "IntrinsicsBase.h"
 
-#define SCALAR_AVX 6
-#define SCALAR_KAHAN 8
-#define SCALAR_BASE 1
-#define SCALAR_AVX_PARALLEL 9
-#define SCALAR_BASE_PARALLEL 10
+#define SCALAR_INT_8 0
+#define SCALAR_INT_16 1
+#define SCALAR_INT_AVX2 2
 
+#if defined AVX2
+//
+#define SCALAR_INT_DEFAULT SCALAR_INT_AVX2
+//#define SCALAR_INT_DEFAULT SCALAR_INT_16
+#else
+#define SCALAR_INT_DEFAULT SCALAR_INT_8
+#endif
 
-#define SCALARUINT(x, y, len) scalarUint(x, y, len, SCALAR_BASE);
+#define SCALARUINT(x, y, len) scalarUint(x, y, len, SCALAR_INT_DEFAULT);
 Uint scalarUint(Uint *x, Uint *y, Uint len, Uint n);
 void matmulttransposedUint(Uint *A, Uint *B, double *c, Uint m, Uint l, Uint n);
 

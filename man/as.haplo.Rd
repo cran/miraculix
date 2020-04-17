@@ -33,13 +33,13 @@ haplomatrix(M, IndividualsPerColumn=TRUE, DoubledIndividuals=TRUE)
 }
 
 \examples{
-  set.seed(0)
-  snps <- 100
-  cols <- 2
-  M <- matrix(sample(0:1, snps * cols, replace=TRUE), ncol = snps)
-  Print(M)
-  (GM <- haplomatrix(M))
-  stopifnot(all(as.matrix(GM) == M))
+set.seed(0)
+snps <- 100
+cols <- 2
+M <- matrix(sample(0:1, snps * cols, replace=TRUE), ncol = snps)
+Print(M)
+print(GM <- haplomatrix(M))
+stopifnot(all(as.matrix(GM) == M))
 }
 
 %library(gtools); keywords()

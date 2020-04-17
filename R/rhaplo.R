@@ -47,7 +47,7 @@ rhaplo <- function(freq, indiv, loci, freq2, file,
  
   if (!hasArg("file")) {
     Code <-.Call(C_rhaplomatrix, freq, freq2, indiv)
-    return(.Call(C_rhaplomatrixPart2, freq, freq2, indiv, Code))
+    return(.Call(C_rhaplomatrixPart2, freq, freq2, Code))
   }
 
   file.type <- match.arg(file.type)
@@ -89,31 +89,34 @@ rhaplo <- function(freq, indiv, loci, freq2, file,
                 row.names=FALSE, col.names=FALSE)
   }
   info <- c(
-      what = HAPLO,
-      snps = loci,# get rid of any attributes
-      individuals=indiv,# get rid of any attributes
+      version = CURRENT_VERSION,
+      snps = as.integer(loci)  ,# get rid of any attributes
+      individuals=as.integer(indiv),# get rid of any attributes
       addr0=0,
       addr1=0,
-      align=0,
+      align0=0,                ## 6
       align1=0,
       sumgeno=0,
       sumgenoE9=0,
-      unused = NA, 
-      unused2 = NA,
+      method = Haplo,
+      alignment = 0,
       isSNPxInd = as.integer(IndivPerCol[file.type]),# get rid of name attribute
-      bitspercode = 1, 
+      bitspercode = 1,
       bytesperblock = NA,
       codesperblock = NA,
-      header=header,
+      header=as.integer(header),
       DoubledIndividuals=as.integer(doubledIndiv),#get rid of attributes
       leadingcolumns=as.integer(leadingcol),#get rid of attributes
       memInUnits0 = NA,
       meminUnits1 = NA,
       AlignedUnits0 = NA,
-      AlignedUnits1 = NA
-   )
+      AlignedUnits1 = NA,
+      unitsperindiv = NA,
+      rep(NA, INFO_LAST - INFO_GENUINELY_LAST)
+  )
+  
+
   attr(file, "information") <- info
-  attr(file, "method") <- Haplo
   class(file) <- HAPLOMATRIX
   return (file)
 }

@@ -21,57 +21,85 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#define PseudoSSE 1     // in case IntrinsicBase does not return anything better
 
-#include <R.h>
-#include <Rinternals.h>
-#include <Rdefines.h>
-#include <R_ext/Linpack.h>
-#include <stdio.h>  
+//#include <R.h>
+//#include <Rinternals.h>
+//#include <Rdefines.h>
+//#include <R_ext/Linpack.h>
+//#include <stdio.h>  
 //#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
+//#include <unistd.h>
+//#include <string.h>
 
 // ACHTUNG: Reihenfolge nicht aendern!
 #include "IntrinsicsBase.h"
 #include "intrinsics.h"
-#include <Basic_utils.h>
 #include "error.h"
-#include <zzz_RandomFieldsUtils.h>
 #include "miraculix.h"
-#include "MX.h"
 #include "options.h"
-//#include "def.h"
 #include "AutoMiraculix.h"
-#include "kleinkram.h"
-#include "xport_import.h"
+#include "xport_import.h" // important! must be very last!
+//                           (HAS_XXX in zzz_RandomFieldsUtils.h)
 
 
 
 snpcoding getAutoCodingIntern() {
   return
-#if defined SSSE3
+#if defined AVX2
+    Shuffle256
+#elif defined SSSE3
     Shuffle
 #elif defined SSE2
-    Hamming2
+    Packed
 #else
-    ThreeBit
+    TwoBit
 #endif
     ;  
 }
 
+
+
+#define AVX2_USED true
+#define AVX_USED false
+#define SSSE3_USED true
+#define SSE2_USED true
+#define SSE_USED false
+
+void PrintSystem() {
+  PRINTF(AttachMessage(miraculix,true));
+  PRINTF("\n");
+}
+
+SEXP attachmiraculix() {
+#ifdef SCHLATHERS_MACHINE
+  PRINTF("floating point double precision: %s\n",
+#if defined DO_FLOAT
+	 "no"
+#else
+	 "yes"
+#endif
+	 );
+#endif
+
+  ReturnAttachMessage(miraculix, true);
+}
+
+void detachmiraculix() {
+  Ext_detachRFoptions(prefixlist, prefixN);
+}
+
+
+
  
 CALL1(void, getErrorString, errorstring_type, errorstring)
 CALL1(void, setErrorLoc, errorloc_type, errorloc)
-
-
 
 const char * prefixlist[prefixN] = {"genetics"};
 
 
 // IMPORTANT: all names of general must have at least 3 letters !!!
 const char *genetics[geneticsN] = 
-  {"digits", "snpcoding", "centered", "normalized", "returnsigma"};
+  {"digits", "snpcoding", "centered", "normalized", "returnsigma", "any2bit"};
 
   
 
@@ -84,16 +112,6 @@ utilsparam *GLOBAL_UTILS;
 const char **all[prefixN] = {genetics};
 int allN[prefixN] = {geneticsN};
  
-#define AVX2_USED true
-#define AVX_USED true
-#define SSSE3_USED true
-
-void PrintSystem() {
-#ifdef AttachMessage
-  PRINTF(AttachMessage(PKG,false));
-#endif
-}
-
 void setparameter(Rint i, Rint j, SEXP el, char name[200], 
 		  bool VARIABLE_IS_NOT_USED isList, Rint local) {
 #ifdef DO_PARALLEL
@@ -107,21 +125,41 @@ void setparameter(Rint i, Rint j, SEXP el, char name[200],
     switch(j) {
     case 0: gp->digits = NUM; break;
     case 1: {
-      Rint m = TYPEOF(el) != STRSXP ? POS0NUM
-	: GetName(el, name, SNPCODING_NAME, last_usr_meth + 1, gp->method);
-#if not defined SSE2 and not defined AVX
+      Rint m;
+      if (TYPEOF(el) != STRSXP) m = POS0NUM;
+      else m= GetName(el, name, SNPCODING_NAMES, LastGenuineMethod + 1, gp->method);
+#if !defined SSE2
       if (m == Hamming2) {
 	PrintSystem();
- 	ERR("In particular, 'Hamming2' is not available under the current compilation.");
+ 	ERR1("'%.20s', which needs 'SSE2', is not available under the current compilation. See the starting message for a remedy.", SNPCODING_NAMES[m]);
       }
-#endif
-#if not defined SSSE3 
-      if (m == Hamming3 || m == Shuffle) {
+      if (m == Packed ||  m == Multiply) {
 	PrintSystem();
-	ERR("In particular, 'Hamming3' and 'Shuffle' are not available under the current compilation.");
+	ERR1("'%.20s', which needs 'SSSE3' is not available under the current compilation. Set 'RFoptions(any2bit=TRUE)' or see the starting message for a remedy.", SNPCODING_NAMES[m]);
       }
 #endif
-      if (m > last_usr_meth) ERR("given snp coding not allowed");
+#if !defined SSSE3 
+      if (m == Hamming3) {
+	PrintSystem();
+	ERR1("'%.20s', which needs 'SSSE3' is not available under the current compilation. See the starting message for a remedy.", SNPCODING_NAMES[m]);
+      }
+      if (m == Shuffle) {
+	PrintSystem();
+	ERR1("'%.20s', which needs 'SSSE3' is not available under the current compilation. Set 'RFoptions(any2bit=TRUE)' or see the starting message for a remedy.", SNPCODING_NAMES[m]);
+      }
+#endif
+#if !defined AVX2
+      if (m == Packed256 || m == Multiply256) {
+	PrintSystem();
+	ERR1("'%.20s', which needs 'AVX2', is not available under the current compilation. See the starting message for a remedy.",
+	    SNPCODING_NAMES[m]);
+      }
+      if (m == Shuffle256) {
+	PrintSystem();
+	ERR1("'%.20s', which needs 'AVX2', is not available under the current compilation. Set 'RFoptions(any2bit=TRUE)' or see the starting message for a remedy.", SNPCODING_NAMES[m]);
+      }
+#endif
+      if (m > LastGenuineMethod) ERR("given snp coding not allowed");
       gp->method = m;
       break;
     }
@@ -155,7 +193,8 @@ void setparameter(Rint i, Rint j, SEXP el, char name[200],
       }
       break;
     case 4 : gp->returnsigma = LOGI; break;
-    default: BUG; 
+    case 5 : gp->any2bit = LOGI; break;
+   default: BUG; 
     }
   }
     break;
@@ -187,6 +226,7 @@ void getparameter(SEXP sublist, Rint i, Rint VARIABLE_IS_NOT_USED local) {
     ADD(ExtendedBooleanUsr(p->centered));    
     ADD(ScalarLogical(p->normalized));
     ADD(ScalarLogical(p->returnsigma));
+    ADD(ScalarLogical(p->any2bit));
   }
     break;
   default : BUG;
@@ -212,7 +252,6 @@ SEXP loadmiraculix() {
   finalparameter(isGLOBAL);
   
   Information = install("information");
-  Method = install("method");
   Coding = install("coding");
 
   if (BytesPerUnit != sizeof(Uint))
@@ -232,27 +271,6 @@ SEXP loadmiraculix() {
 }
 
 
-SEXP attachmiraculix() {
-#ifdef SCHLATHERS_MACHINE
-  PRINTF("floating point double precision: %s\n",
-#if defined DO_FLOAT
-	 "no"
-#else
-	 "yes"
-	 );
-#endif
-#endif
-
-#ifdef ReturnAttachMessage
-  ReturnAttachMessage(miraculix, true);
-#else
-  return R_NilValue;
-#endif
-}
-
-void detachmiraculix() {
-  Ext_detachRFoptions(prefixlist, prefixN);
-}
 
 
 #ifndef HAS_PARALLEL
@@ -285,11 +303,6 @@ void detachmiraculix() {
 #define HAS_SSE true
 #else
 #define HAS_SSE false
-#endif
-#if defined MMX
-#define HAS_MMX true
-#else
-#define HAS_MMX false
 #endif
 #endif
 

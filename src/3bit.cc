@@ -25,27 +25,26 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // _MM_ALIGN16 Uint ccc;
 #define BitsPerCode 3L
+#define MY_METHOD ThreeBit
 
 #include "Bit23.intern.h"
-#include <Basic_utils.h>
 #include "haplogeno.h"
 #include "Haplo.h"
+#include "align.h"
 
-INLINER
-
-
-
-#define TWO_GENUINEBITSPERMINIBLOCK 32768  // for testing only
+#define TWO_GENUINEBITSPERMINIBLOCK 32768  // testing only
+#define TABLE_SIZE  two_genuineBitsPerMiniblock
+#define nr_results 4
 
 static double rev_geno_code[7] = {0, RF_NA, RF_NA, 1, RF_NA, RF_NA, 2}; 
 static BlockType geno_code[nr_genotypes] = {0, 3, 6}, // 0, 1, 2
-  result_code[nr_results] = {0, 3, 2, 6};
+  result_code[nr_results] = {0, 3, 2, 6}; //
 static Uint result_value[nr_results] = {0, 1, 2, 4};
 
 // Codierung: 0->0; 1->3; 2->6
 static table_type *TABLE3 = NULL;
 void initiate_table3() { // hash table 
-  if (TABLE3 != NULL) BUG; 
+ if (TABLE3 != NULL) BUG; 
   initiate_tableI(&TABLE3, TABLE_SIZE, CodesPerMiniblock, BitsPerCode,
 		  result_code, result_value, nr_results);
 }
@@ -55,19 +54,48 @@ void static printbits(BlockType x) { //
   printbits(x, sizeof(BlockType) * BitsPerByte, BitsPerCode);//
 }
 */
-Uint CodesPerBlock3() { return CodesPerBlock; }
-Uint UnitsPerIndiv3(Uint snps) { return Blocks(snps) * UnitsPerBlock; }
+
+Ulong static inline genuineBlocks(Ulong snps) {				
+  return 1L + (snps - 1L) / genuineCodesPerBlock; }				
+
+Uint BytesPerBlock3() { return BytesPerBlock; }
+Uint CodesPerBlock3() { return genuineCodesPerBlock; }
+Uint UnitsPerIndiv3(Uint snps) { return genuineBlocks(snps) * UnitsPerBlock; }
+#define UPI UnitsPerIndiv3
+Uint BitsPerCode3() { return BitsPerCode; }
 
 void Init3() {
+  if (MiniblocksPerBlock != 4) BUG;
   assert(BytesPerBlock == sizeof(BlockType0));
   if (TABLE3 == NULL) initiate_table3();
 }
 
 
 // these defintions must match extactly as.genomicmatrix
-SEXP matrix_coding_start3 START23(Init3)
-Ulong sumGeno3 sumGeno23
+SEXP matrix_start3 START23(Init3)
 
+  
+Ulong sumGeno3(Uint *S, Uint snps, Uint individuals) {	
+  Ulong	unitsPerIndiv = UPI(snps),					
+    sum = 0L;							
+  Uint counter = 0;						
+  for (Uint i=0; i<individuals; i++, S += unitsPerIndiv) { /* ok */	
+    for (Ulong j=0; j<unitsPerIndiv; j++) {				
+      Uint s = S[j];						
+      for (Uint u=0; u<CodesPerUnit; u++) {			
+	sum += rev_geno_code[s & CodeMask];
+	s >>= BitsPerCode;					
+	if (++counter >= CodesPerMiniblock) {			
+	  s >>= deltaMiniblockBits;				
+	  counter = 0;						
+	}							
+      }								
+    }							  
+  }							  
+  return sum;						  
+  }
+
+  
 
 void haplo2geno3(Uint *X, Uint snps, Uint individuals, Uint unitsPerIndiv,
 		 Uint *ans) {
@@ -76,61 +104,64 @@ void haplo2geno3(Uint *X, Uint snps, Uint individuals, Uint unitsPerIndiv,
 
 
 
-void matrix_coding3 Coding23Matrix;
+void coding3(Uint *X, Uint start_individual, Uint end_individual,		
+	     Uint start_snp, Uint end_snp, Uint Mnrow,				
+	     SEXP Ans, double VARIABLE_IS_NOT_USED * G) {/*closing in .cc file*/
+  if (start_snp % genuineCodesPerBlock != 0) BUG;			
+  Uint *info = GetInfo(Ans),						
+    snps = info[SNPS],
+    unitsPerIndiv = UPI(snps),
+    *ans = Align(Ans, ALIGN_23) +
+         start_snp * UnitsPerBlock / genuineCodesPerBlock;
+  									
 Coding23(start_individual, end_individual, start_snp, end_snp, Mnrow,
 	 FROMINPUT);
+ 
 } // see bit23intern.h
 
- 
-void MmPsq3(Uint individuals, Uint min_row, Uint max_row,
-	    Uint min_col, Uint max_col,
-	    Uint compressed_start, Uint compressed_end, Uint blocks,
-	    BlockType0 *M, double *ergb, bool Parallel) {
-  //   printf("i=%d r=%d %d c=%d %d comp=%d %d bl=%d\n",
-  //	 individuals,  min_row, max_row, min_col, max_col,
-  //	 compressed_start,  compressed_end, blocks);
 
-   table_type *table = TABLE3;
-  assert(//min_row >= 0 && min_col >= 0 &&
-	 max_row <= individuals && max_col <= individuals);
+
+void crossprod3(Uint * M, Uint snps, Uint individuals, double *A) {
+  if (TABLE3 == NULL) Init3();
+  Uint blocks = genuineBlocks(snps),
+    unitsPerIndiv = UPI(snps);
+  table_type *table = TABLE3;
+  assert(table != NULL);
 
 #ifdef DO_PARALLEL
-#pragma omp parallel for num_threads(CORES) if (Parallel)
+#pragma omp parallel for num_threads(CORES) 
 #endif	  
-  for (Uint c=min_col; c<max_col; c++) {
-    Uint r  =  c > min_row ? c : min_row;
-    BlockType * Mc = M + c * blocks,
-      *Mr = M + r * blocks;
-    double *ptr = ergb + c * individuals,
-      *res_ptr_r = ptr + r;
-    for ( ; r<max_row; r++, res_ptr_r++, Mr += blocks) {
+  for (Uint i=0; i<individuals; i++) {   
+    Uint * Mi = M + i * unitsPerIndiv,
+      *Mj = Mi;
+    
+    double *ans = A + i,
+      *ptr = A + i * individuals,
+      *res_ptr_r = ptr + i;
+    for ( Uint j  =  i; j<individuals; j++, res_ptr_r++, Mj += unitsPerIndiv) {
       Uint sum = 0;
-      BlockType *MR = Mr + compressed_start,
-	*MC = Mc + compressed_start;
-      for (Uint s=compressed_start; s<compressed_end; s++, MR++, MC++) {
+      BlockType *MJ = (BlockType0*) Mj,
+	*MI = (BlockType0*) Mi;
+      for (Uint s=0; s<blocks; s++, MJ++, MI++) {
 	block_compressed x;
-	x.x = *MR & *MC;
-	sum+= table[x.b[0]] + table[x.b[1]] + table[x.b[2]] + table[x.b[3]];
+	x.x = *MJ & *MI;
+	sum+= (table[x.b[0]] + table[x.b[1]] + table[x.b[2]] + table[x.b[3]]);
       }
-      ergb[c + r * individuals] = *res_ptr_r = (double) sum;
-     }
+      ans[j * individuals] = *res_ptr_r = (double) sum;
+    }
   }
 }
 
 
-
-double getValue3(BlockType0 *Indiv, Uint s) {
-  block_compressed x;
-  x.x =  Indiv[s / genuineCodesPerBlock];
-  Uint idx = s % genuineCodesPerBlock,
-    y = x.b[idx / CodesPerMiniblock] >> ( (idx % CodesPerMiniblock) * BitsPerCode); 
-  //  printf("y=%d \n", (Uint) y);
+double getValue3(BlockType0 *MC, Uint s) {
+  uint16_t x = ((uint16_t*) MC)[s / CodesPerMiniblock];
+  Uint idx = s % CodesPerMiniblock; 
+  //  printf("y=%d %d \n", genuineCodesPerBlock, CodesPerMiniblock);
   // printf("%10e\n", rev_geno_code[y & CodeMask]);
   //  printf("ok\n");
 
-  return rev_geno_code[y & CodeMask];
+  return rev_geno_code[(x >> (BitsPerCode * idx)) & CodeMask];
 }
-
 
 
 SEXP get_matrix3(SEXP SNPxIndiv) {
@@ -139,15 +170,18 @@ SEXP get_matrix3(SEXP SNPxIndiv) {
     *info = GetInfo(SNPxIndiv),
     individuals = info[INDIVIDUALS],
     snps = info[SNPS],
-    blocks = Blocks(snps),    
-    endfor = individuals * blocks;
+    unitsPerIndiv = UPI(snps),
+    *M = Align(SNPxIndiv, ALIGN_23);
   SEXP Ans;
-  PROTECT(Ans = get_matrix23_start(individuals, snps, R_NilValue));
+  PROTECT(Ans = get_matrix23_start(snps, individuals, R_NilValue));
   Uint *ans = (Uint *) INTEGER(Ans);
-  BlockType *M = (BlockType0 *) Align(SNPxIndiv, ALIGN_23);
-  for (Uint a=0; a<endfor; a+=blocks) {
-    BlockType *Ma = M + a;
-    for (Uint s=0; s<snps; s++) *(ans++) = getValue3(Ma, s);
+#ifdef DO_PARALLEL
+#pragma omp parallel for num_threads(CORES)
+#endif	  
+  for (Uint i=0; i < individuals; i++) {
+    Uint *A = ans + i * snps;
+    BlockType *Ma = (BlockType0*) (M + i * unitsPerIndiv);
+    for (Uint s=0; s<snps; s++) A[s] = getValue3(Ma, s);
   }
   UNPROTECT(1);
   return Ans;
@@ -158,23 +192,22 @@ SEXP get_matrix3(SEXP SNPxIndiv) {
 
 SEXP get_matrixN_3(SEXP SNPxIndiv, SEXP Snps) {
   if (TABLE3 == NULL) Init3();
-  GET_MATRIX_N_23(getValue3);
+  Uint *M =  Align(SNPxIndiv, ALIGN_23); 
+  GET_MATRIX_N_23(getValue3, UPI);
 }
 
 
 
 SEXP allele_freq3(SEXP SNPxIndiv) {
  if (TABLE3 == NULL) Init3();
- ALLELE_FREQ23(getValue3);
+ Uint *M = Align(SNPxIndiv, ALIGN_23);
+ ALLELE_FREQ23(getValue3, UPI);
 }
 
-
-void matrix3_mult(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A) {
-  Uint blocks = Blocks(snps);
-  MmPsq3(individuals, 0, individuals, 0, individuals, 0, blocks, blocks,
-	 (BlockType0 *) SNPxIndiv, A, true);
-}
 
 Uint *Align3(SEXP Code, Uint nr, bool test) { return AlignTest(Code, nr, test); }
 
-void zeroNthGeno3 ZERONTH
+void zeroNthGeno3(SEXP SNPxIndiv, SEXP Snps) {					
+  Uint *M = Align(SNPxIndiv, ALIGN_23);
+  ZERONTH(UPI);
+}

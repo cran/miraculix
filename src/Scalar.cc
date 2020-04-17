@@ -32,109 +32,66 @@ PKG_CXXFLAGS =  $(SHLIB_OPENMP_CXXFLAGS)  -march=native -mssse3
  */
 
 
-//#include <assert.h>
-//#include "kleinkram.h"
 #include "Scalar.h"
 #include <General_utils.h>
-//#include "intrinsics.h"
-//#include "Basic_utils.h"
-//#include "errors_messages.h"
-//#include "zzz_RandomFieldsUtils.h"
+#include "dummy.h"
+#include "intrinsics.h"
+#include "miraculix.h"
 
 
-//#define Nmodi 9
-//name_type modi = { "1x1", "2x2", "4x4", "8x8", "near", "simple", "precise", "kahan", "1x1p"};
+#define U(N) v1[N] * v2[N]
 
+#define scalarNbyN(AtOnce, AndSoOn)				      \
+  Uint scalarUint##AtOnce##by##AtOnce( Uint * v1, Uint * v2, Uint N){ \
+    Uint						\
+    *endv1 = v1 + (N / AtOnce) * AtOnce,		\
+      *end = v1 + N,					\
+      sum = 0.0;							\
+    for(; v1 < endv1; v1 += AtOnce, v2 += AtOnce)			\
+      sum += U(0) + U(1) + U(2) + U(3) AndSoOn;				\
+    for(; v1 < end; v1++, v2++) sum +=  v2[0] * v1[0];			\
+    return sum;								\
+}
 
-#define size 8
-#define vectorlen (256 / (size * 8))
-#define repet 8
-#define atonce (vectorlen * repet)
+scalarNbyN(4,)
+scalarNbyN(8, + U(4) + U(5) + U(6) + U(7))
+scalarNbyN(16, + U(4) + U(5) + U(6) + U(7) + U(8) + U(9) + U(10) + U(11) + U(12) + U(13) + U(14) + U(15))
 
-#if (8 != repet)
-  wrong repet length
-#endif
-#if (4 != vectorlen)
-  wrong vector length
-#endif
+#if defined AVX2
+Uint scalarUintAVX2(Uint * V1, Uint * V2, Uint N){
+  Uint steps = N / UnitsPerBlock;
+  BlockType0    
+    *v1 = (BlockType0 *) V1,
+    *endv1 = v1 + steps,
+    *v2 = (BlockType0 *) V2;
+  BlockUnitType sum;
+  ZERO(sum.vi);
 
+  Uint zaehler = 0;
 
-
-
-void matmulttransposedUint(Uint *A, Uint *B, double *c, Uint m, Uint l, Uint n) {
-// multiplying t(A) and B with dim(A)=(m,l) and dim(B)=(m,n),
-// saving result in C
-#ifdef DO_PARALLEL
-#pragma omp parallel for num_threads(CORES) 
-#endif
-  for (Uint i=0; i<l; i++) {    
-    double *C = c + i;
-    Uint *Aim = A + i * m;
-    for (Uint j=0; j<n; j++) C[j * l] = (double) SCALARUINT(Aim, B + j * m, m);
+  for(; v1 < endv1; v1 ++, v2 ++) {
+    zaehler++;
+    BlockType dummy, s1, s2;
+    LOADU(s1, v1);
+    LOADU(s2, v2);    
+    MULT32(dummy, s1, s2);
+    ADD32(sum.vi, sum.vi, dummy);
   }
-}
-
-
-
- 
-Uint scalarUint2by2( Uint * v1, Uint * v2, Uint N){
-  Uint *endv1 = v1 + (N / 2) * 2,
-    *end = v1 + N,
-    sum = 0;
-  for(; v1 < endv1; v1 += 2, v2 += 2) sum += v2[0] * v1[0] + v2[1] * v1[1];
-  if (v1 < end) sum += v2[0] * v1[0]; 
-  return sum;
-}
- 
- 
-Uint scalarUint4by4( Uint * v1, Uint * v2, Uint N){
-  Uint*endv1 = v1 + (N / 4) * 4,
-    *end = v1 + N,
-    sum = 0;
-  for(; v1 < endv1; v1 += 4, v2 += 4)
-    sum += v2[0] * v1[0] + v2[1] * v1[1] + v2[2] * v1[2]+ v2[3] * v1[3];
-  for(; v1 < end; v1++, v2++) sum += v2[0] * v1[0];        
-  return sum;
-}
-
- 
-Uint scalarUint8by8( Uint * v1, Uint * v2, Uint N){
+  
   Uint
-    *endv1 = v1 + (N / 8L) * 8L,
-    *end = v1 + N,
-    sum = 0.0;
-  for(; v1 < endv1; v1 += 8L, v2 += 8L)
-    sum += v2[0] * v1[0] + v2[1] * v1[1]+ v2[2] * v1[2] + v2[3] * v1[3] +
-      v2[4] * v1[4] + v2[5] * v1[5]+ v2[6] * v1[6]+ v2[7] * v1[7];
-  for(; v1 < end; v1++, v2++) sum +=  v2[0] * v1[0];        
-  return sum;
+    totalsum = (sum.u32[0] + sum.u32[1] + sum.u32[2] + sum.u32[3] +
+		sum.u32[4] + sum.u32[5]	+ sum.u32[6] + sum.u32[7]
+		),
+    total = steps * UnitsPerBlock,
+    *end = V1 + N;  				
+  V1 += total;
+  V2 += total;
+  for(; V1 < end; V1++, V2++) totalsum += V2[0] * V1[0];			
+  return totalsum;								
 }
-
-
-
-Uint scalarUintPX( Uint * V1, Uint * V2, Uint N){
-#define AtOnce 16
-  Uint
-    *endv1 = V1 + (N / AtOnce) * AtOnce,
-    *end = V1 + N,
-    sum = 0;
-#ifdef DO_PARALLEL
-#pragma omp parallel for num_threads(CORES) if (N > 200) reduction(+:sum) schedule(dynamic, 50) 
+#else
+Uint scalarUintAVX2(Uint * V1, Uint * V2, Uint N) { BUG; }
 #endif
-  for(Uint *v1=V1; v1 < endv1; v1 += AtOnce) {
-    Uint *v2 = V2 + (V1 - v1);
-    sum +=  v2[0] * v1[0] + v2[1] * v1[1]+ v2[2] * v1[2] + v2[3] * v1[3] +
-      v2[4] * v1[4] + v2[5] * v1[5]+ v2[6] * v1[6]+ v2[7] * v1[7] +
-      v2[8] * v1[8] + v2[9] * v1[9]+ v2[10] * v1[10] + v2[11] * v1[11] +
-      v2[12] * v1[12] + v2[13] * v1[13]+ v2[14] * v1[14]+ v2[15] * v1[15];
-  }
-  Uint
-    *v1 = V1 + (N / AtOnce),
-    *v2 = V2 + (V1 - v1);
-  for(; v1 < end; v1++, v2++) sum += v2[0] * v1[0];        
-  return sum;
-}
-
 
 
 //bool pr = true;
@@ -149,45 +106,106 @@ Uint scalarUint(Uint *x, Uint *y, Uint len, Uint n) {
 //6:7.4
 //7: 7.9
 // 8: "ewige" schleife
-
   switch(n) {
-  case 0 : //return scalarUint(x, y, len);
-  case SCALAR_BASE : return scalarUint8by8(x, y, len); 
-  case 2 : return scalarUint4by4(x, y, len); 
-  case 3 : return scalarUint2by2(x, y, len);
-#ifdef FMA_AVAILABLE_X_X_X_X_X_X
-  case 4 : //return avx_scalarUintDfma(x, y, len);
-#endif    
-#ifdef AVX_X_X_X_X_X_X
-  case 5 : //return avx_scalarUintDnearfma(x, y, len); 
-  case SCALAR_AVX : return avx_scalarUintD(x, y, len); // best one kernel
-  case 7 : return avx_scalarUintDP(x, y, len);  //best
-    //  case SCALAR_KAHAN : return avx_scalarUintDK(x, y, len);  -- macht keinen Sinn bei Uint
-#else
-  case 4: case 5: case 6: case 7: case 8 : return scalarUint8by8(x, y, len);
-#endif
-
-
-    
-#ifndef DO_PARALLEL // so does not work
-    
-#ifdef DO_PARALLEL
-  case SCALAR_AVX_PARALLEL :
-#if defined AVX and defined OpenMP
-    return avx_scalarUintDparallel(x, y, len);
-#endif    
-  case SCALAR_BASE_PARALLEL : return scalarUintP(x, y, len);// parallel, nicht-vectoriell
-#else
-  case SCALAR_AVX_PARALLEL :
-#ifdef AVX
-  return avx_scalarUintD(x, y, len);
-#endif     
-   case SCALAR_BASE_PARALLEL : return scalarUint2by2(x, y, len); 
-#endif
-     
-#endif
+  case SCALAR_INT_8 : return scalarUint8by8(x, y, len); 
+  case SCALAR_INT_16 : return scalarUint16by16(x, y, len);
+  case SCALAR_INT_AVX2 : return scalarUintAVX2(x, y, len);
   default : ERR("method not available"); 
   }
   return RF_NAN;
 }
   
+
+ 
+
+void matmulttransposedUint(Uint *A, Uint *B, double *c, Uint m, Uint l, Uint n) {
+// multiplying t(A) and B with dim(A)=(m,l) and dim(B)=(m,n),  
+// saving result in C
+  if (A == B && n == l) {
+#ifdef DO_PARALLEL
+#pragma omp parallel for num_threads(CORES) schedule(dynamic, 20)
+#endif
+    for (Uint i=0; i<l; i++) {    
+      double *C = c + i;
+      Uint *Aim = A + i * m;
+      for (Uint j=i; j<n; j++)
+	c[j + i * l] = C[j * l] = (double) SCALARUINT(Aim, B + j * m, m);
+    }
+  } else {
+#ifdef DO_PARALLEL
+#pragma omp parallel for num_threads(CORES) 
+#endif
+    for (Uint i=0; i<l; i++) {    
+      double *C = c + i;
+      Uint *Aim = A + i * m;
+      for (Uint j=0; j<n; j++) C[j * l] = (double) SCALARUINT(Aim, B + j * m,m);
+    }
+  }
+}
+
+
+
+SEXP crossprodInt(SEXP X, SEXP Y, SEXP mode) {
+  int n;
+  Uint nrow,
+    len,
+    lenY,
+    ncol;
+  if (isMatrix(X)) {
+    nrow = ncols(X);
+    len = nrows(X);
+  } else {
+    nrow = 1;
+    len = length(X);
+  }
+  if (isMatrix(Y)) {
+    ncol = ncols(Y);
+    lenY = nrows(Y);
+  } else {
+    ncol = 1;
+    lenY = length(Y);
+  }
+  if (lenY != len) ERR("sizes of 'x' and 'y' do not match");
+  if (length(mode) == 0) n = SCALAR_INT_DEFAULT;
+  else {
+    n = INTEGER(mode)[0];
+    if (n < 0) n =  SCALAR_INT_DEFAULT;
+  }
+  SEXP Ans; 
+  PROTECT(Ans = allocMatrix(INTSXP, nrow, ncol));
+  Uint *x, *y,
+    *ans = (Uint*) INTEGER(Ans);
+  if (TYPEOF(X) == INTSXP) x = (Uint*) INTEGER(X); else x=(Uint*) LOGICAL(X);
+  if (TYPEOF(Y) == INTSXP) y = (Uint *)INTEGER(Y); else y=(Uint*) LOGICAL(Y);
+
+  
+  if (x == y) {
+    assert(nrow == ncol);
+#ifdef DO_PARALLEL
+#pragma omp parallel for num_threads(CORES) schedule(dynamic, 20)
+#endif
+    for (Uint i=0; i<nrow; i++) {    
+      Uint *C = ans + i,
+	*Aim = x + i * len;
+      for (Uint j=i; j<nrow; j++)
+	ans[j + i * nrow] = C[j * nrow] = SCALARUINT(Aim, x + j * len, len);
+    }
+  } else {
+#ifdef DO_PARALLEL
+#pragma omp parallel for num_threads(CORES) 
+#endif
+    for (Uint i=0; i<nrow; i++) {    
+      Uint *C = ans + i,
+	*Aim = x + i * len;
+      for (Uint j=0; j<ncol; j++)
+	C[j * nrow] = SCALARUINT(Aim, y + j * len, len);
+    }
+  }
+
+  
+  UNPROTECT(1);
+  return Ans;
+}
+
+
+

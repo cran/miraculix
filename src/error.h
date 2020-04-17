@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define miraculix_error_H 1
 
 #include <General_utils.h>
+#include "dummy.h"
 
 #ifdef DO_PARALLEL
 #define LOCAL_MSG char MSG[LENERRMSG]

@@ -33,44 +33,34 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // #include "IntrinsicsBase.h" --- darf nicht rein !!!
 #include "intrinsics.h"
 
-
-#define FROMINPUT  *(pX++)
-#define FROMHAPLO GetHaplo(pX, s)
-
-
-#define INLINER								\
-  Uint static inline *algn(int *X) {assert(algn_general(X, BytesPerBlock)>=(uintptr_t)X); return (Uint *) algn_general(X, BytesPerBlock); } \
-									\
-  Uint static inline Blocks(Uint X) { return 1L + (X - 1L) / CodesPerBlock; } 
-
-#define Units(snps) (Blocks(snps) * UnitsPerBlock)
-
-//  (Ulong) Blocks(S) * I * UnitsPerBlock;
-
-
-#define ALL_INLINER INLINER						\
-  real static inline *algnrl(real *X) {assert(algn_general(X, BytesPerBlock)>=(uintptr_t)X); return (real *)  algn_general(X, BytesPerBlock); } \
-  \
-Uint static inline RealAlign(Uint X) { return BytesPerBlock / sizeof(real) + (1L +  (X - 1L) / CodesPerBlock) * CodesPerBlock; }
-
-
-
 Uint *AlignBase(SEXP CM, Uint nr, Uint bytesperblock, bool test);
-#define Align(CM, nr) AlignBase(CM, nr, BytesPerBlock, true)
-#define AlignTest(CM, nr, test) AlignBase(CM, nr, BytesPerBlock, test)
 
-Uint* DoAlign(SEXP SNPxIndiv, Uint nr, snpcoding method);
+//Uint* DoAlign(SEXP SNPxIndiv, Uint nr, snpcoding method);
 //Uint* DoAlignWithoutTest(SEXP CM, Uint nr, snpcoding method);
 SEXP createSNPmatrix(Uint snps, Uint individuals, snpcoding method);
 Ulong sumGeno(Uint * SNPxIndiv, Uint snps, Uint individuals, snpcoding method);
 
-void ReUseAs(SEXP Code, snpcoding method);
 Uint haplo2geno(Uint * SNPxIndiv, Uint snps, Uint individuals,
-		snpcoding method, Uint unitsPerIndiv, Uint *A);
-
-double *matrix_mult(Uint * SNPxIndiv, Uint snps, Uint individuals,
+		snpcoding method, Uint unitsPerIndivH, Uint *A);
+void haplo2geno(SEXP H, Uint *code, snpcoding method);
+double *crossprod(Uint * SNPxIndiv, Uint snps, Uint individuals,
 		    snpcoding method,  bool centred, bool normalized,
 		    Ulong SumGeno);
+
+Uint GetBytesPerBlock(snpcoding method);
+Uint GetCodesPerBlock(snpcoding method);
+Uint GetBitsPerCode(snpcoding method);
+Uint GetUPI(Uint snps, snpcoding method);
+
+
+void ReUseAs(SEXP Code, snpcoding method);
+SEXP CreateEmptyCodeVector(Uint snps, Uint individuals, snpcoding method);
+void start_info(SEXP Code, SEXP file);
+void allInfo(Uint * info);
+void allInfo(SEXP M);
+
+Ulong calculateAlignedMem(Ulong memInUnits, snpcoding method,
+			  Uint bytesPerBlock);
 
 #endif
 

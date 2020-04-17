@@ -4,8 +4,7 @@
  Martin Schlather, schlather@math.uni-mannheim.de
 
 
- Copyright (C) 2014 -- 2019  Martin Schlather
-Copyright (C) 2014 -- 2015 Florian Skene: SSE2+SSE3
+Copyright (C) 2019 -- 2019  Martin Schlather
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,32 +23,34 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define BitsPerCode 32L
 #define UNCOMPRESSED 1
+#define MY_METHOD NoSNPcoding
 
 //#include <stdio.h>
 //#include "options.h"
 #include "AutoMiraculix.h"
 #include "intrinsics.h"
 #include <General_utils.h>
-// #include "error.h"
+#include "dummy.h"
+#include "align.h"
 #include "haplogeno.h"
 #include "Haplo.h"
 #include "Scalar.h"
 
-INLINER
-
+Uint BytesPerBlockPlain() { return BytesPerBlock; }
 Uint CodesPerBlockPlain() { return CodesPerBlock; }
 Uint UnitsPerIndivPlain(Uint snps) { return snps; }
+Uint BitsPerCodePlain() { return BitsPerCode; }
 
-SEXP matrix_start_plain(Uint individuals, Uint snps,
+SEXP matrix_start_plain( Uint snps, Uint individuals,
 			SEXP VARIABLE_IS_NOT_USED  file) {
-  SEXP Code = CreateEmptyCodeVector(snps, individuals, snps);
-  return Code;
+  return CreateEmptyCodeVector(snps, individuals, MY_METHOD);
 }
 
 
 
-void matrix_plain(Uint *M, Uint start_individual, Uint end_individual, 
-		  Uint start_snp, Uint end_snp, Uint Mnrow,
+void coding_plain(Uint *M, Uint start_individual, Uint end_individual, 
+		  Uint start_snp, Uint end_snp,
+		  Uint Mnrow,
 		  SEXP Ans, double VARIABLE_IS_NOT_USED *G) {
   Uint
     *info = GetInfo(Ans),
@@ -66,21 +67,13 @@ void matrix_plain(Uint *M, Uint start_individual, Uint end_individual,
 
 
 
-SEXP matrix_coding_plain(Uint *M, Uint snps, Uint individuals){
-  SEXP Code;
-  PROTECT(Code = matrix_start_plain(individuals, snps, R_NilValue));
-  matrix_plain(M, 0, individuals, 0, snps, snps, Code, NULL);
-  UNPROTECT(1);
-  return Code;
-}
 
 SEXP get_matrixPlain(SEXP SNPxIndiv) {
    Uint 
      *info = GetInfo(SNPxIndiv),
-      individuals = info[INDIVIDUALS],
-     snps = info[SNPS];
-   Uint
-     *M = (Uint*) Align(SNPxIndiv, ALIGN_SSE);
+     individuals = info[INDIVIDUALS],
+     snps = info[SNPS],
+     *M = Align(SNPxIndiv, ALIGN_SSE);
    SEXP Ans;
    PROTECT(Ans=allocMatrix(INTSXP, snps, individuals));
    MEMCOPY(INTEGER(Ans), M, (Ulong) snps * individuals * sizeof(Uint));
@@ -101,7 +94,7 @@ Ulong sumGenoPlain(Uint *S, Uint snps, Uint individuals) {
 }
 
 void haplo2genoPlain(Uint *code, Uint snps, Uint individuals,
-		    Uint unitsPerIndiv, Uint *MM) {
+		     Uint unitsPerIndiv, Uint *MM) {
   Ulong total = (Ulong) snps * individuals;
   for (Ulong i=0; i<total; i++) MM[i] = 0; // noetig?
   assert(BitsPerCode == 32);
@@ -117,6 +110,8 @@ void haplo2genoPlain(Uint *code, Uint snps, Uint individuals,
   }
 }
 
-void matrixPlain_mult(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A){
+void crossprod_Plain(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A){
   matmulttransposedUint(SNPxIndiv, SNPxIndiv, A, snps, individuals, individuals);
 }
+
+

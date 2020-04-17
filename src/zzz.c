@@ -82,7 +82,7 @@ static R_CallMethodDef callMethods[]  = {
   CALLDEF(matrixvector012, 2),
   CALLDEF(matrix_coding, 1),
   CALLDEF(matrix_get, 1),
-  CALLDEF(matrix_mult, 1),
+  CALLDEF(crossprod, 1),
   
 
   CALLDEF(getAutoCoding, 0),
@@ -104,14 +104,12 @@ static R_CallMethodDef callMethods[]  = {
   CALLDEF(zeroNthGeno, 2),
   CALLDEF(get_matrix_N, 2),
   CALLDEF(rhaplomatrix, 3),
-  CALLDEF(rhaplomatrixPart2, 4),
+  CALLDEF(rhaplomatrixPart2, 3),
 
   CALLDEF(createSNPmatrix, 2),
   CALLDEF(fillSNPmatrix, 3),
   CALLDEF(vectorGeno, 2),
   CALLDEF(genoVector, 2),
-  CALLDEF(unlock, 1),
-  CALLDEF(dolocking, 1),
   CALLDEF(computeSNPS, 8),
   CALLDEF(compute, 9),
   CALLDEF(allele_freq, 1),
@@ -120,6 +118,8 @@ static R_CallMethodDef callMethods[]  = {
   CALLDEF(solveRelMat, 5),
   CALLDEF(substract_centered, 1),
   CALLDEF(get_centered, 0),
+  CALLDEF(is2BitMethod, 1),
+  CALLDEF(crossprodInt, 3),
   
   //  CALLDEF(),
  //  CALLDEF(codeSNPs, 2),

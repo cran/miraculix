@@ -78,20 +78,3 @@ RM <- function(...) {
 }
 
 
-
-#########################################################
-## from below here are only temporary functions
-
-unlock <- function(...,  envir = as.environment(-1)) {
-  L <- list(...)
-  if (!all(sapply(L, function(x) length(attr(x, "information")) > 0)))
-    stop("not all arguments are coded objects (Note that 'codeOrigin' formally does return a coded object. So these objects cannot be unlock-ed.");
- if (is.character(L[[1]])) {
-    if (!all(sapply(L, is.character)))
-      stop("arguments must be all variables or all character vectors")
-    L <- unlist(L)
-  } else {
-    L <- as.character(substitute(list(...)))[-1]
-  }
-  for (i in L)  .Call(C_unlock, get(i, envir=envir))
-}

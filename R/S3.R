@@ -22,16 +22,18 @@
 
 print_haplogeno <- function(x, name, ...) {
   info <- attr(x, "information")
+#  print.default(x)
+#  print.default(info)
   indiv <- info[INDIVIDUALS + 1]
-  method <- attr(x, "method")
-   if (indiv > 1) {
+  method <- info[METHOD + 1]
+  if (indiv > 1) {
     cat(if (method == Haplo) "Loci" else "SNP",
         " x Indiv ", name, " matrix with ",
-        SNPCODING_NAME[method + 1],
+        SNPCODING_NAMES[method + 1],
         " snpcoding: [1:", info[SNPS + 1], ", 1:", indiv,"]",
         sep="")
     if (method == Haplo) cat(" (twice)")
-   } else
+  } else
     cat(if (method == Haplo) "Haplotype " else "SNP",
         "information at ", info[SNPS + 1], " loci.", sep="")
     

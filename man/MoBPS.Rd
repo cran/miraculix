@@ -11,9 +11,9 @@
   The functions below have been written mainly for use in the package
   \pkg{MoBPS} written by Torsten Pook.
   
-  \command{codeOrigins} compresses information on generation of
+  \command{codeOrigins} compresses information about generation of
   introduced new genes, 
-  sex, number of individual and haplotype in a single 32 Bit integer
+  sex, number of individuals and haplotype in a single 32 Bit integer
   value.
 
   \command{decodeOrigins} make the compressed data human readable again.
@@ -23,7 +23,7 @@
   cohort.
  
   \command{compute} essentially
-  concatenates (efficiently) the two commands \command{computeSNPS},
+  concatenates (efficiently) the three commands \command{computeSNPS},
   \command{\link{relationshipMatrix}},
   \command{\link{solveRelMat}}
 
@@ -37,7 +37,7 @@ compute(population, gen, sex, nr, tau, vec, betahat, select = NULL,
         matrix.return=FALSE)
 }
  \arguments{
-   \item{M}{a matrix of information on generation of introduced new genes,
+   \item{M}{matrix with information on generation of introduced new genes,
     sex, number of individual and haplotype on each line.
     the generation takes values in 1...2^6, sex values in 1...2^1,
     individual values in 1...2^22 and the haplotype values in 1...2^3
@@ -48,7 +48,7 @@ compute(population, gen, sex, nr, tau, vec, betahat, select = NULL,
     to be decoded.
   }
   \item{population}{list of list, as described in package
-    \pkg{Rekombre}, which contains the whole information of all
+    \pkg{MoBPs}, which contains the whole information of all
     generations of a breeding scheme
   }
   \item{gen,sex,nr}{information specifying an individuum; instead of the
@@ -80,28 +80,22 @@ compute(population, gen, sex, nr, tau, vec, betahat, select = NULL,
 
   \command{computeSNPS} : vector of integers with either human readable
   values or compressed data depending on the argument \code{what}.
-
-    \command{solveRelMat} returns a list of 2 or 3 elements (depending on
-    the value of \code{matrix.return}.
-    First element equals \deqn{(A + \tau I)^{-1}
-      v}.  Second element equals \deqn{A(A + \tau I)^{-1} v + \beta}. Third
-      element equals the relationship matrix if \code{matrix.return=TRUE}.      
 }
 
 
 \me
 
-\examples{
+\examples{ % library(miraculix)
 set.seed(0)
 n <- sample(1000, 1)
 M <- cbind(sample(1:2^6, n, replace=TRUE),
            sample(1:2^1, n, replace=TRUE),
            sample(1:2^22, n, replace=TRUE),
            sample(1:2^3, n, replace=TRUE))
-CM <- codeOrigins(M)
 print(head(M))
-print(head(CM))
 Z <- matrix(NA, ncol=ncol(M), nrow=nrow(M))
+CM <- codeOrigins(M)
+print(head(CM))
 for (i in 1:nrow(M))  Z[i, ] <- decodeOrigins(CM, i)
 stopifnot(all(M == Z))
 }

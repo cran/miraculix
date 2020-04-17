@@ -80,11 +80,10 @@ extern "C" {
   SEXP hasSSSE3();
   SEXP hasAVX2();
   SEXP hasAVX();
-
   
   SEXP matrix_coding(SEXP M) ;  //
   SEXP matrix_get(SEXP M);  
-  SEXP matrix_mult(SEXP M);
+  SEXP crossprod(SEXP M);
 
   SEXP file_get(SEXP file);
   SEXP file_dot(SEXP file, SEXP g);
@@ -105,8 +104,6 @@ extern "C" {
   //  SEXP codeHaplo2(SEXP M1, SEXP M2, SEXP);
   SEXP vectorGeno(SEXP V, SEXP Z);
   SEXP genoVector(SEXP Z, SEXP V);
-  SEXP unlock(SEXP X);
-  SEXP dolocking(SEXP Do);
   SEXP computeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
 		   SEXP From_SNP, SEXP To_SNP, SEXP Select, SEXP Geno);
   SEXP allele_freq(SEXP CGM);
@@ -117,8 +114,10 @@ extern "C" {
   SEXP solveRelMat(SEXP R, SEXP tau, SEXP vec, SEXP b, SEXP destroy);
   SEXP substract_centered(SEXP SnpXindiv);
   SEXP get_centered();
-  SEXP rhaplomatrix(SEXP freq, SEXP freq2,  SEXP indiv);
-  SEXP rhaplomatrixPart2(SEXP freq, SEXP freq2, SEXP indiv, SEXP Code);
+  SEXP rhaplomatrix(SEXP freq, SEXP freq2,  SEXP individuals);
+  SEXP rhaplomatrixPart2(SEXP freq, SEXP freq2, SEXP Code);
+  SEXP is2BitMethod(SEXP Method);
+  SEXP crossprodInt(SEXP X, SEXP Y, SEXP mode);
   
 
 #ifdef __cplusplus

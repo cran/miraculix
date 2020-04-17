@@ -25,23 +25,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_auto_H
 #define miraculix_auto_H 1
 
-SEXP matrix_start_plain(Uint individuals, Uint snps, SEXP G);
-void matrix_plain(Uint *M, Uint start_individual, Uint end_individual, 
+SEXP matrix_start_plain(Uint snps, Uint individuals,  SEXP G);
+void coding_plain(Uint *M, Uint start_individual, Uint end_individual, 
 		  Uint start_snp, Uint end_snp,  Uint Mnrow, SEXP Ans,
 		  double *G);
-SEXP matrix_coding_plain(Uint *M, Uint snps, Uint individuals);
 SEXP get_matrixPlain(SEXP SNPxIndiv);
 Uint *AlignPlain(SEXP Code, Uint nr, bool test);
+Uint BytesPerBlockPlain();
 Uint CodesPerBlockPlain();
 Uint UnitsPerIndivPlain(Uint snps);
+Uint BitsPerCodePlain();
 Ulong sumGenoPlain(Uint *S, Uint snps, Uint individuals);
 void haplo2genoPlain(Uint * SNPxIndiv, Uint snps, Uint individuals,
 		     Uint unitsPerIndiv, Uint *A);
 Ulong sumGenoPlain(Uint *S, Uint snps, Uint individuals);
-void matrixPlain_mult(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A);
-
-
-
+void crossprod_Plain(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A);
 
 #endif
 

@@ -24,143 +24,91 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 #define BitsPerCode 2L
-#define PseudoSSE 1     // in case IntrinsicBase does not return anything better
+
 
 #include "IntrinsicsBase.h"
 #include "intrinsics.h"
 #include <General_utils.h>
+#include "dummy.h"
 #include "xport_import.h"
-#include "miraculix.h"
-#include "MX.h"
 #include "haplogeno.h"
 
+#define MY_METHOD Haplo
+#include "align.h"
 
-INLINER
+#define BitsPerCode 2L
+static Uint rev_haplo_code[4] = {0L, 1L, 1L, 2L};
 
 
-
+Uint BytesPerBlockHaplo() { return BytesPerBlock; }
 Uint CodesPerBlockHaplo() { return CodesPerBlock; }
-Uint UnitsPerIndivHaplo(Uint snps) { return Blocks(snps) * UnitsPerBlock; }
+#define UPI UnitsPerIndiv256
+Uint BitsPerCodeHaplo() { return BitsPerCode; }
 
 void assert_haplo() {
 }
 
-
-
-Uint *AlignHaplo(SEXP Code, Uint nr, bool test) {
-  return AlignTest(Code, nr, test); }
+void assert_haplo(SEXP CM) {
+  Uint *info = GetInfo(CM);
+  if (info[METHOD] != Haplo) ERR("not a haplotype matrix");
+}
 
 
 SEXP create_codevectorHaplo(Uint snps, Uint individuals) {
-  assert_haplo();  
-  Uint memPerIndiv = Blocks(snps) * UnitsPerBlock;
-  SEXP Code = CreateEmptyCodeVectorHaplo(snps, individuals, memPerIndiv);
-  if (PRESERVE) {BUG; R_PreserveObject(Code);}
-  //  printf("dxone\n");
- return(Code);
+  assert_haplo();
+  return CreateEmptyCodeVector(snps, individuals, MY_METHOD);
 }
 
+SEXP create_codevectorHaplo(Uint snps, Uint individuals,
+			     SEXP VARIABLE_IS_NOT_USED X) {
+  return create_codevectorHaplo(snps, individuals);
+}
 
-void InnerDetermHaplo(double *freq1, double *freq2,
-		      Uint snps, Uint individuals, Uint *code) {
-  Ulong units = Blocks(snps) * UnitsPerBlock,
-    fullBlocks = snps / CodesPerBlock;
-  //  printf("snps = %d\n", snps);
-  for (Uint i=0; i<individuals; i++, code += units) {
-    for (Uint j=0; j<fullBlocks; j++) {
-      Uint *C = code + j * UnitsPerBlock,
-	mm = j * CodesPerBlock;
-      for (Uint u=0; u<CodesPerUnit; u++) {
-	Uint shift = u * BitsPerCode;
-	for (Uint k=0; k<UnitsPerBlock; k++, mm++) {
-	  double f2 = freq2[mm];
-	  Rint mm1 = freq1[mm] == 1.0,
-	    mm2 = ISNA(f2) ? mm1 : (f2  == 1.0);
-	  //	  printf("A mm=%d    %d %d     %f %f\n", mm, mm1, mm2, freq1[mm], freq2[mm]);
-	  C[k] |= (mm1 << shift) | (mm2 << (shift + 1));
-	}
-      }
-    }
-    if (fullBlocks * CodesPerBlock < snps) {
-      Uint 
-	*C = code + fullBlocks * UnitsPerBlock,
-	mm = CodesPerBlock * fullBlocks;
-      for (Uint u=0; u<CodesPerUnit; u++) {     
-	Uint shift = u * 2;
-	for (Uint k=0; k<UnitsPerBlock && mm < snps; k++, mm++) {
-	  double f2 = freq2[mm];
-	  Rint mm1 = freq1[mm] == 1.0,
-	    mm2 = ISNA(f2) ? mm1 : (f2  == 1.0);
-	  // printf("B mm=%d    %d %d     %f %f\n", mm, mm1, mm2, freq1[mm], freq2[mm]);
-	 
-	  C[k] |= (mm1 << shift) | (mm2 << (shift + 1));
-	}
-	if (mm == snps) break;
-      }
-    }
+#define Inner(mm12)							\
+  (double *freq1, double *freq2, Uint *info, Uint *code) {		\
+    Ulong snps = info[SNPS];						\
+    Uint individuals = info[INDIVIDUALS],				\
+      unitsPerIndiv = UPI(snps),				\
+      allUnits = Units(snps);						\
+    for (Uint i=0; i<individuals; i++, code += unitsPerIndiv) {	/* ok */ \
+      Uint mm = 0;							\
+      for (Uint j=0; j<allUnits; j++) {					\
+	Uint dummy = 0;							\
+	for (Uint shft=0; shft<BitsPerUnit && mm < snps; mm++) {	\
+	  double f2 = freq2[mm];					\
+	  mm12;								\
+	  dummy |= mm1 << shft++;					\
+	  dummy |= mm2 << shft++;					\
+	}								\
+	code[j] = dummy;						\
+      }									\
+    }									\
   }
-}
 
+void InnerDetermHaplo Inner(Uint mm1 = freq1[mm] == 1.0;	 
+			    Uint mm2 = ISNA(f2) ? mm1 : (f2  == 1.0))
 
-void InnerRandomHaplo(double *freq1, double *freq2,
-		      Uint snps, Uint individuals, Uint *code) {
-  Ulong units = Blocks(snps) * UnitsPerBlock;
-  Uint 
-    fullBlocks = snps / CodesPerBlock;
-  //  printf("snps = %d\n", snps);
-  for (Uint i=0; i<individuals; i++, code += units) {
-    for (Uint j=0; j<fullBlocks; j++) {
-      Uint *C = code + j * UnitsPerBlock,
-	mm = j * CodesPerBlock;
-      for (Uint u=0; u<CodesPerUnit; u++) {
-	Uint shift = u * BitsPerCode;
-	for (Uint k=0; k<UnitsPerBlock; k++, mm++) {
-	  double f2 = freq2[mm];
-	  Rint mm1 = UNIFORM_RANDOM <= freq1[mm],
-	    mm2 = ISNA(f2) ? mm1 : UNIFORM_RANDOM <= f2;
-	  //	  printf("C  mm=%d    %d %d     %f %f\n", mm, mm1, mm2, freq1[mm], freq2[mm]);
-	  
-	  C[k] |= (mm1 << shift) | (mm2 << (shift + 1));
-	}
-      }
-    }
-    if (fullBlocks * CodesPerBlock < snps) {
-      Uint 
-	*C = code + fullBlocks * UnitsPerBlock,
-	mm = CodesPerBlock * fullBlocks;
-      for (Uint u=0; u<CodesPerUnit; u++) {     
-	Uint shift = u * 2;
-	for (Uint k=0; k<UnitsPerBlock && mm < snps; k++, mm++) {
-	  double f2 = freq2[mm];
-	  Rint mm1 = UNIFORM_RANDOM <= freq1[mm],
-	    mm2 = ISNA(f2) ? mm1 : UNIFORM_RANDOM <= f2;
-	  //	  printf("D mm=%d    %d %d     %f %f %d\n", mm, mm1, mm2, freq1[mm], freq2[mm], ISNA(f2));
-	  C[k] |= (mm1 << shift) | (mm2 << (shift + 1));
-	}
-	if (mm == snps) break;
-      }
-    }
-    //  printf("\n");
-  }
-}
-
+void InnerRandomHaplo Inner(Uint mm1 = UNIFORM_RANDOM <= freq1[mm];
+			    Uint mm2 = ISNA(f2) ? mm1 : UNIFORM_RANDOM <= f2)
 
 SEXP rhaplomatrix(SEXP Freq1, SEXP Freq2, SEXP Individuals) {
   Uint individuals = INTEGER(Individuals)[0],
     snps = length(Freq1);
   if (snps != (Uint) length(Freq2))
     ERR("'freq' and 'freq2' do not have the same length");
- return create_codevectorHaplo(snps, individuals);
+  return create_codevectorHaplo(snps, individuals);
 }
 
   
-SEXP rhaplomatrixPart2(SEXP Freq1, SEXP Freq2, SEXP Individuals, SEXP Code) {
+SEXP rhaplomatrixPart2(SEXP Freq1, SEXP Freq2, SEXP Code) {
   double *freq1 = REAL(Freq1),
     *freq2 = REAL(Freq2);
-  Uint individuals = INTEGER(Individuals)[0],
+  Uint
+    *info = GetInfo(Code),
     snps = length(Freq1),
-    *C =  Align(Code, ALIGN_HAPLO);
-
+    *C =  Align256(Code, ALIGN_HAPLO);
+  assert(snps == info[SNPS]);
+ 
   bool random = false;  
   for (Uint i=0; i < snps; i++) {
     double f = freq1[i];
@@ -175,50 +123,31 @@ SEXP rhaplomatrixPart2(SEXP Freq1, SEXP Freq2, SEXP Individuals, SEXP Code) {
 
   if (random) {
     GetRNGstate();
-    // printf("snps=%d indivi=%d \n", snps, individuals);
-    InnerRandomHaplo(freq1, freq2, snps, individuals, C);
+    InnerRandomHaplo(freq1, freq2, info, C);
     PutRNGstate();
   } else {
-    InnerDetermHaplo(freq1, freq2, snps, individuals, C);
+    InnerDetermHaplo(freq1, freq2, info, C);
   }
 
   return Code;
 }
 
-void codeInnerHaplo2(Uint *M1, Uint *M2, Uint snps, Uint *code) {
+void codeInnerHaplo2(Uint *M1, Uint *M2, SEXP Code){ //Uint snps, Uint *code) {
   Uint j,
-    fullBlocks = snps / CodesPerBlock;
-#ifdef DO_PARALLEL
-#pragma omp parallel for num_threads(CORES)
-#endif
-  for (j=0; j<fullBlocks; j++) {
-    Uint *C = code + j * UnitsPerBlock,
-      *mm1 = M1 + j * CodesPerBlock,
-      *mm2 = M2 + j * CodesPerBlock;
-    for (Uint u=0; u<CodesPerUnit; u++) {
-      Uint shift = u * BitsPerCode;
-      for (Uint k=0; k<UnitsPerBlock; k++, mm1++, mm2++) {
-	assert(*mm1 == 0 || *mm1 == 1);
-	assert(*mm2 == 0 || *mm2 == 1);
-	C[k] |= (*mm1 << shift) | (*mm2 << (shift + 1));
-      }
-    } 
-  }
-  if (fullBlocks * CodesPerBlock < snps) {
-    Uint *end = M1 + snps,
-      *C = code + fullBlocks * UnitsPerBlock;
-    M1 += CodesPerBlock * fullBlocks;
-    M2 += CodesPerBlock * fullBlocks;
-    for (Uint u=0; u<CodesPerUnit; u++) {
-     
-      Uint shift = u * 2;
-      for (Uint k=0; k<UnitsPerBlock && M1 < end; k++, M1++, M2++) {
-	assert(*M1 == 0 || *M1 == 1);
-	assert(*M2 == 0 || *M2 == 1);
-	C[k] |= (*M1 << shift) | (*M2 << (shift + 1));
-      }
-      if (M1 == end) break;
+    *info = GetInfo(Code),
+    snps = info[SNPS],
+    *code = Align256(Code, ALIGN_HAPLO),
+    *endM1 = M1 + snps,
+    allUnits = Units(snps);					
+  for (j=0; j<allUnits; j++) {
+    Uint  dummy = 0;
+    for (Uint shft=0; shft<BitsPerUnit && M1 < endM1; M1++, M2++) {
+      assert(*M1 == 0 || *M1 == 1);
+      assert(*M2 == 0 || *M2 == 1);
+      dummy |= *M1 << shft++;			       
+      dummy |= *M2 << shft++;
     }
+    code[j] = dummy;
   }
 }
 
@@ -233,8 +162,7 @@ SEXP codeHaplo2(SEXP M1, SEXP M2) {// 2 x Haplo - Matrix, as vector gespeichert
   PROTECT(Code = create_codevectorHaplo(snps, 1));
   ToInt(M1);  
   ToInt(M2);  
-  codeInnerHaplo2(M1int, M2int, snps, Align(Code, ALIGN_HAPLO));
-  if (PRESERVE) R_PreserveObject(Code);
+  codeInnerHaplo2(M1int, M2int, Code); // snps,  Align256(Code, ALIGN_HAPLO));
   FREEint(M1);
   FREEint(M2);
   UNPROTECT(1);
@@ -244,38 +172,38 @@ SEXP codeHaplo2(SEXP M1, SEXP M2) {// 2 x Haplo - Matrix, as vector gespeichert
 
 
 
-SEXP GetHaploSequence(Uint snps, Uint indiv,
+SEXP GetHaploSequence(Uint snps, Uint individuals,
 		      bool indivpercol, bool doubledIndiv,
 		      Uint currentBits, // BitsPerCode
-		      Uint *blockIncr, Uint *bitIncr,
+		      Uint *unitIncr, Uint *bitIncr,
 		      Uint *delta, Uint *indivIncr, bool create){
   SEXP Ans = R_NilValue;
   
   if (indivpercol) {
     *indivIncr = snps * currentBits;
     if (doubledIndiv) {
-      *blockIncr = CodesPerBlock; // X
+      *unitIncr = CodesPerUnit; // X
       *delta = currentBits == 1 ? 0L : snps ; // X; pointing to next bit
       *bitIncr = 1L; // X
-      //printf("%d %d %d\n", snps, indiv, currentBits);
-      if (create) Ans = allocMatrix(INTSXP, snps, indiv*currentBits);
+      //printf("%d %d %d\n", snps, individuals, currentBits);
+      if (create) Ans = allocMatrix(INTSXP, snps, individuals * currentBits);
    } else {
-      *blockIncr = BitsPerBlock * currentBits / BitsPerCode;
+      *unitIncr = BitsPerUnit * currentBits / BitsPerCode;
       *delta = currentBits == 1 ? 0L : 1L;
       *bitIncr = currentBits;
-      if (create) Ans = allocMatrix(INTSXP, (Ulong) currentBits * snps, indiv);
+      if (create) Ans = allocMatrix(INTSXP, (Ulong) currentBits * snps, individuals);
     }
   } else {
-    *blockIncr = BitsPerBlock * indiv * currentBits / BitsPerCode;
-    *bitIncr = currentBits * indiv;
+    *unitIncr = BitsPerUnit * individuals * currentBits / BitsPerCode;
+    *bitIncr = currentBits * individuals;
     if (doubledIndiv) {
       *delta = currentBits == 1 ? 0L : 1L;
       *indivIncr = currentBits;
-      if (create) Ans = allocMatrix(INTSXP, currentBits * indiv, snps);
+      if (create) Ans = allocMatrix(INTSXP, currentBits * individuals, snps);
     } else {
-      *delta = currentBits == 1 ? 0L : indiv;
+      *delta = currentBits == 1 ? 0L : individuals;
       *indivIncr = 1L;
-      if (create) Ans=allocMatrix(INTSXP,  indiv, (Ulong) currentBits * snps);
+      if (create) Ans=allocMatrix(INTSXP,  individuals, (Ulong) currentBits * snps);
     }
   }
   return Ans;
@@ -284,63 +212,47 @@ SEXP GetHaploSequence(Uint snps, Uint indiv,
 
 
 
-void codeInnerHaplo(Uint *MM, Uint snps, Uint indiv,
-		    bool indivpercol, bool doubledIndiv, Uint *code) {  
-  Uint j, blockIncr, bitIncr, delta, indivIncr,
-    bits = snps * BitsPerCode,
-    fullBlocks = bits / BitsPerBlock;
-  Ulong units = Blocks(snps) * UnitsPerBlock;
+void codeInnerHaplo(Uint *MM, bool indivpercol, bool doubledIndiv, SEXP Code) {
+  Uint unitIncr, bitIncr, delta, indivIncr,
+    *code = Align256(Code, ALIGN_HAPLO),
+    *info = GetInfo(Code),
+    snps = info[SNPS],
+    individuals = info[INDIVIDUALS],   
+    //    bits = snps * BitsPerCode,
+    unitsPerIndiv = UPI(snps),
+    allUnits = Units(snps),
+    allUnitsM1 = allUnits -1,
+    rest = (snps - allUnitsM1 * CodesPerUnit) * BitsPerCode;
 
-  GetHaploSequence(snps, indiv, indivpercol, doubledIndiv, BitsPerCode,
-		   &blockIncr, &bitIncr, &delta, &indivIncr, false);
+  GetHaploSequence(snps, individuals, indivpercol, doubledIndiv, BitsPerCode,
+		   &unitIncr, &bitIncr, &delta, &indivIncr, false);
 
 #ifdef DO_PARALLEL
 #pragma omp parallel for num_threads(CORES)
 #endif
-
-
-  
-  for (Uint i=0; i<indiv; i++) {
-    Uint *cm = code + i * units,
+  for (Ulong i=0; i<individuals; i++) {
+    Uint *cm = code + i * unitsPerIndiv,
       *M = MM + i * indivIncr;
-    for (j=0; j<fullBlocks; j++) {
-      Uint *C = cm + j * UnitsPerBlock,
-	*mm = M + j * blockIncr,
-	*mm2 = mm + delta;
-      for (Uint u=0; u<CodesPerUnit; u++) {
-	Uint shift = u * BitsPerCode;
-	for (Uint k=0; k<UnitsPerBlock; k++, mm+=bitIncr, mm2 += bitIncr) {
-	  assert(*mm == 0 || *mm == 1);
-	  assert(*mm2 == 0 || *mm2 == 1);
-	  C[k] |= *mm2 << (shift + 1);
-	  C[k] |= *mm << shift;	  
-	}
-      }
-    }
-    if (fullBlocks * CodesPerBlock < snps) {
-      Uint 
-	*C = cm  + fullBlocks * UnitsPerBlock,
-	*mm = M + fullBlocks * blockIncr,
+    for (Ulong j=0; j<allUnits; j++) {
+      Uint
+	dummy = 0,
+	*mm = M + j * unitIncr,
 	*mm2 = mm + delta,
-	*end = M + snps * bitIncr;
-      for (Uint u=0; u<CodesPerUnit; u++) {
-	Uint shift = u * BitsPerCode;
-	for (Uint k=0; k<UnitsPerBlock && mm < end;
-	     k++, mm+=bitIncr, mm2 += bitIncr) {
-	  assert(*mm == 0 || *mm == 1);
-	  assert(*mm2 == 0 || *mm2 == 1);
-	  C[k] |= *mm2 << (shift + 1);
-	  C[k] |= *mm << shift;
-	}
-	if (mm >= end) break;
+	end = j==allUnitsM1 ? rest : BitsPerUnit;
+      for (Uint shft=0; shft < end; mm+=bitIncr, mm2 += bitIncr) {
+	assert(*mm == 0 || *mm == 1);
+	assert(*mm2 == 0 || *mm2 == 1);
+	dummy |= *mm << shft++;
+	dummy |= *mm2 << shft++;
       }
+      cm[j] = dummy;
     }
   }
 }
 
 SEXP codeHaplo(SEXP M, SEXP IndivPerCol, SEXP DoubledIndiv) {// 2 x Haplo - Matrix, as vector gespeichert
   if (length(M) == 0) ERR("'M' has length 0.");
-  Uint snps, indiv,
+  Uint snps, individuals,
     nrow = (Uint) nrows(M),
     ncol = (Uint) ncols(M);
   bool doubledIndiv = LOGICAL(DoubledIndiv)[0],
@@ -348,90 +260,72 @@ SEXP codeHaplo(SEXP M, SEXP IndivPerCol, SEXP DoubledIndiv) {// 2 x Haplo - Matr
 
   if (indivpercol) {
     snps = nrow;
-    indiv = ncol;
+    individuals = ncol;
   } else {
     snps = ncol;
-    indiv = nrow;
+    individuals = nrow;
   }
   if (doubledIndiv) {
-    // printf("%d (%d %d) %d \n", indiv, nrow, ncol, BitsPerCode);
-    if (indiv % BitsPerCode != 0)
+    // printf("%d (%d %d) %d \n", individuals, nrow, ncol, BitsPerCode);
+    if (individuals % BitsPerCode != 0)
       ERR("information on individuals not doubled");
-    indiv /= BitsPerCode;
+    individuals /= BitsPerCode;
   } else {
     if (snps % BitsPerCode != 0) ERR("information on haplotype odd");
     snps /= BitsPerCode;
   }
 
   SEXP Code;
-  PROTECT(Code = create_codevectorHaplo(snps, indiv));
+  PROTECT(Code = create_codevectorHaplo(snps, individuals));
   //  printf("? %d\n", TYPEOF(Code));
   ToInt(M);
   //  printf("! %d\n", TYPEOF(Code));
-  codeInnerHaplo(Mint, snps, indiv, indivpercol, doubledIndiv,
-		 Align(Code, ALIGN_HAPLO));
-  //  printf("@\n");
-  if (PRESERVE) R_PreserveObject(Code);
+  codeInnerHaplo(Mint, indivpercol, doubledIndiv, Code);
   FREEint(M);
   UNPROTECT(1);
   return Code;
 }
 
 void InitGetHaplo(SEXP CM, Uint **code, Uint *unitsPerIndiv) {
-  assert_haplo();
+  assert_haplo(CM);
   Uint 
     *info = GetInfo(CM),
     snps = info[SNPS];
-  *unitsPerIndiv = (Ulong) Blocks(snps) * UnitsPerBlock;
-  *code = Align(CM, ALIGN_HAPLO);
+  *unitsPerIndiv = UPI(snps);
+  *code = Align256(CM, ALIGN_HAPLO);
 }
 
-//*cm = code + unitsPerIndiv * i,
-Uint rev_haplo_code[4] = {0L, 1L, 1L, 2L};
+#define ByteCodeMask 3
+
 Uint GetHaplo(Uint *cm, Uint snp) {
-  assert(BitsPerCode == 2);
-  Uint 
-    j = snp / CodesPerBlock,
-    remainder = snp % CodesPerBlock,
-    *C = cm + j * UnitsPerBlock,     
-    u = remainder / UnitsPerBlock,
-    k = remainder % UnitsPerBlock;
-  return rev_haplo_code[(C[k] >> (u * BitsPerCode)) & CodeMask];
+  return rev_haplo_code[(((char *) cm)[snp / CodesPerByte] >> ((snp % CodesPerByte) * BitsPerCode)) & ByteCodeMask];
 }
 
-Uint GetHaploX(Uint *cm, Uint snp) { // to be deleted
-  assert(BitsPerCode == 2);
-  Uint 
-    j = snp / CodesPerBlock,
-    remainder = snp % CodesPerBlock,
-    *C = cm + j * UnitsPerBlock,     
-    u = remainder / UnitsPerBlock,
-    k = remainder % UnitsPerBlock;
+Uint GetHaploX(Uint *cm, Uint snp) {
+  return (((char *) cm)[snp / CodesPerByte] >> ((snp % CodesPerByte) * BitsPerCode)) & ByteCodeMask;
+} 
 
-  //  printf("H=%d ", (C[k] >> (u * BitsPerCode)) & CodeMask);
-  return (C[k] >> (u * BitsPerCode)) & CodeMask;
-}
-
-
-SEXP decodeHaplo(SEXP CM, SEXP Indiv,
+SEXP decodeHaplo(SEXP CM, SEXP Individuals,
 		 SEXP Sets, SEXP IndivPerCol, SEXP DoubledIndiv) {
-  assert_haplo();
+  assert_haplo(CM);
   //printf("%d %d %d\n", length(CM), length(IndivPerCol), length(DoubledIndiv));
-  bool IndivGiven = length(Indiv) > 0;
-  Uint blockIncr, bitIncr, delta, indivIncr,
-    *info = GetInfo(CM),
+  bool IndivGiven = length(Individuals) > 0;
+  Uint unitIncr, bitIncr, delta, indivIncr,
     currentBits = length(Sets),
+    *info = GetInfo(CM),
     snps = info[SNPS], 
-    indiv = info[INDIVIDUALS],
-    currentIndiv = IndivGiven ? length(Indiv) : indiv,
-    *I = IndivGiven ? (Uint*) INTEGER(Indiv) : NULL,
-    bits = snps * BitsPerCode,
-    fullBlocks = bits / BitsPerBlock,
-    *code = Align(CM, ALIGN_HAPLO);
-  Ulong units = Blocks(snps) * UnitsPerBlock;
+    individuals = info[INDIVIDUALS],
+    currentIndiv = IndivGiven ? length(Individuals) : individuals,
+    *I = IndivGiven ? (Uint*) INTEGER(Individuals) : NULL,
+    //   bits = snps * BitsPerCode,
+    allUnits = Units(snps),
+    allUnitsM1 = allUnits - 1,
+    rest = snps - allUnitsM1 * CodesPerUnit,
+    *code = Align256(CM, ALIGN_HAPLO);
+  Ulong unitsPerIndiv =UPI(snps);
   bool doubledIndiv = LOGICAL(DoubledIndiv)[0],
     indivpercol = LOGICAL(IndivPerCol)[0];
-  if (info[WHAT] != HAPLO) ERR("not a haplo coding");
+  if (info[METHOD] != Haplo) ERR("not a haplotype matrix");
   //    printf("doubledindiv = %d\n", doubledIndiv);
   if (currentBits != 1 && currentBits != BitsPerCode)
     ERR("The number of chromosome sets can only be 1 or 2.");
@@ -440,10 +334,10 @@ SEXP decodeHaplo(SEXP CM, SEXP Indiv,
     ERR("The sets must be given in the order 1:2")
   else if (!set1 && INTEGER(Sets)[0] != 2)
     ERR("The value for a chromosome set can be 1 and 2 only.");
-  
+ 
   SEXP Ans;
   PROTECT(Ans = GetHaploSequence(snps, currentIndiv, indivpercol, doubledIndiv,
-				 currentBits, &blockIncr, &bitIncr, &delta,
+				 currentBits, &unitIncr, &bitIncr, &delta,
 				 &indivIncr, true));
   
   Uint *MM = (Uint*) INTEGER(Ans);
@@ -452,66 +346,46 @@ SEXP decodeHaplo(SEXP CM, SEXP Indiv,
   assert(BitsPerCode == 2);
 
   assert(snps > 0);
-  assert(indiv > 0);
+  assert(individuals > 0);
   //printf("currentIndiv = %d\n", currentIndiv);
   
 #ifdef DO_PARALLEL
 #pragma omp parallel for num_threads(CORES)   
 #endif
-  for (Uint i=0; i<currentIndiv; i++) {
-    Uint *cm = code + units * (IndivGiven ? I[i] - 1 : i),
+  for (Ulong i=0; i<currentIndiv; i++) {
+    Uint *cm = code + unitsPerIndiv * (IndivGiven ? I[i] - 1 : i),
       *M = MM + i * indivIncr;
 #if defined SCHLATHERS_MACHINE
     Uint snp = 0;
 #endif    
-    for (Uint j=0; j<fullBlocks; j++) {
+    for (Ulong j=0; j<allUnits; j++) {
       Uint
-	*C = cm + j * UnitsPerBlock,
-	*mm = M + j * blockIncr,
-	*mm2 = mm + delta;
-      for (Uint u=0; u<CodesPerUnit; u++) {
-	Uint shift = 1 << u * BitsPerCode,
-	  shiftP1 = shift << 1;
-	for (Uint k=0; k<UnitsPerBlock; k++, mm+=bitIncr, mm2 += bitIncr) {
-	  // ordering important !!! as mm2 might be overwritten by mm!!
-	  *mm2 = (C[k] & shiftP1) > 0;
-	  if (set1) *mm = (C[k] & shift) > 0;
-#if defined SCHLATHERS_MACHINE
-	  assert(delta == 0 || GetHaploX(cm, snp++) == *mm + 2 * *mm2);
-#endif    
-	}
-      }
-    }
-    if (fullBlocks * CodesPerBlock < snps) {
-      Uint
-	*C = cm + fullBlocks * UnitsPerBlock,
-	*mm = M + fullBlocks * blockIncr,
+	C = cm[j],
+	*mm = M + j * unitIncr,
 	*mm2 = mm + delta,
-	*end = M + snps * bitIncr;
-      for (Uint u=0; u<CodesPerUnit; u++) {
-	Uint shift = 1 << u * BitsPerCode,
-	  shiftP1 = shift << 1;
-	for (Uint k=0; k<UnitsPerBlock && mm < end;
-	     k++, mm+=bitIncr, mm2 += bitIncr) {
-	  *mm2= (C[k] & shiftP1) > 0;
-	  if (set1) *mm = (C[k] & shift) > 0;
-	  //	  printf("mm = %u %u %u; set1=%d delta=%d\n", *mm, *mm2, GetHaploX(cm,snp),set1, delta);
-	  
-	  assert(delta == 0 || GetHaploX(cm, snp++) == *mm  + 2 * *mm2);
-	}
-	if (mm >= end) break;
-      }
+ 	shift = 1L,
+	end = j == allUnitsM1 ? rest : CodesPerUnit;
+      for (Uint u=0; u<end; u++, mm+=bitIncr, mm2 += bitIncr) {
+	// ordering important !!! as mm2 might be overwritten by mm!!
+	*mm2 = (C & (shift << 1)) > 0; // never change as mm could be mm2!!
+	if (set1) *mm = (C & shift) > 0;
+#if defined SCHLATHERS_MACHINE
+	//	printf("j=%d delta=%d set1=%d shift=%d %d indivpcol=%d dbl=%d %d %d\n", j, delta,  set1, shift, shift << 1, indivpercol, doubledIndiv, GetHaploX(cm, snp),  *mm + 2 * *mm2);
+	assert(delta == 0 || GetHaploX(cm, snp++) == *mm + 2 * *mm2);
+#endif
+ 	shift <<= 2;
+    }
     }
   }
 
-  if (PRESERVE) R_PreserveObject(Ans);
+  UNPROTECT(1);
   return Ans;
 }
 
 
 
 void zeroNthHaplo(SEXP CM, SEXP NN) { // 0.45 bei 25000 x 25000
-  assert_haplo();
+  assert_haplo(CM);
   Uint
     first2bits32 = 0x00000003,
     *N = (Uint*) INTEGER(NN),
@@ -519,19 +393,16 @@ void zeroNthHaplo(SEXP CM, SEXP NN) { // 0.45 bei 25000 x 25000
     *info = GetInfo(CM),
     snps = info[SNPS],
     individuals = info[INDIVIDUALS],
-    blocks = Blocks(snps),
-    *C0 = Align(CM, ALIGN_HAPLO);
-  if (info[WHAT] != HAPLO) ERR("not a genomicmatrix coding");
+    unitsPerIndiv =  UPI(snps),
+    *C0 = Align256(CM, ALIGN_HAPLO);
+  if (info[METHOD] != Haplo) ERR("not a haplotype matrix");
   
-  for (Ulong i=0; i<individuals; i++) {    
-    BlockType *C1 = ((BlockType0 *) C0) + i * blocks;
-    for (Uint ni=0; ni<lenN; ni++) {
-      Uint j=N[ni] / CodesPerBlock,
-	jj = N[ni] % CodesPerBlock,
-	u = jj / UnitsPerBlock,
-	k = jj % UnitsPerBlock;     
-      BlockType *C = C1 + j;
-      ((BlockUnitType*) C)->u32[k] &= ~(first2bits32 << (BitsPerCode * u));
+  for (Ulong j=0; j<individuals; j++) {    
+    Uint *C1 = C0 + j * unitsPerIndiv;
+    for (Uint i=0; i<lenN; i++) {
+      Uint k=N[i] / CodesPerUnit,
+	n = N[i] % CodesPerUnit;
+      C1[k] &= ~(first2bits32 << (BitsPerCode * n));
     }
   }
 }

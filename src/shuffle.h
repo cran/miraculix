@@ -27,29 +27,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "MX.h"
 
-
-void matrixshuffle_mult(Uint* CGM, Uint snps, Uint individuals, double *ans);
-SEXP matrix_start_shuffle(Uint individuals, Uint snps, SEXP G);
-void matrix_shuffle(Uint *M, Uint start_individual, Uint end_individual, 
-		    Uint start_snp, Uint end_snp, Uint Mnrow,
-		    SEXP Ans, double * G);
-
-SEXP get_matrixshuffle(SEXP SNPxIndiv);
-SEXP matrix_coding_shuffle(Uint *M, Uint snps, Uint individuals);
-
-SEXP create_codevector(Uint snps, Uint individuals);
-Uint *AlignShuffle(SEXP Code, Uint nr, bool test);
-void InitShuffle();
+Uint BytesPerBlockShuffle();
 Uint CodesPerBlockShuffle();
-Uint UnitsPerIndivShuffle(Uint snps);
-void haplo2genoShuffle(Uint * SNPxIndiv, Uint snps, Uint individuals, Uint *A);
-Ulong sumGenoShuffle(Uint *S, Uint snps, Uint individuals);
+void crossprod_shuffle(Uint* CGM, Uint snps, Uint individuals, double *ans);
+SEXP matrix_start_shuffle(Uint snps, Uint individuals, SEXP G);
+bool useShuffle(snpcoding method);
 
-void zeroNthGenoShuffle(SEXP CM, SEXP NN);
-SEXP allele_freqShuffle(SEXP GM);
-SEXP get_matrixN_shuffle(SEXP CM, SEXP NN);
-void ReUseAsShuffle(SEXP Code);
-
+Uint BytesPerBlockShuffle256();
+Uint CodesPerBlockShuffle256();
+void crossprod_shuffle256(Uint* CGM, Uint snps, Uint individuals, double *ans);
+SEXP matrix_start_shuffle256(Uint snps, Uint individuals, SEXP G);
+bool useShuffle256(snpcoding method);
 
 
 #endif

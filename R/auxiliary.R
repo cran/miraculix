@@ -19,11 +19,12 @@
 ## along with this program; if not, write to the Free Software
 ## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.  
 
-has.instruction.set <- function(which=c("SSE2", "SSSE3",  "AVX", "AVX2")) {
+has.instruction.set <- function(which=c("SSE2", "SSSE3", "AVX", "AVX2")) {
   ans <- logical(length(which))
   for (i in 1:length(ans)) {
     ans[i] <-
       switch(which[i],
+             ##  "MMX" = .Call(C_hasMMX),
              "SSE2" = .Call(C_hasSSE2),
              "SSSE3" = .Call(C_hasSSSE3),
              "AVX" = .Call(C_hasAVX),
@@ -34,12 +35,6 @@ has.instruction.set <- function(which=c("SSE2", "SSSE3",  "AVX", "AVX2")) {
 }
 
 
-
-dolocking <-function(do=TRUE) {
-  if (length(do) > 0 && do) stop("sorry dolocking has not been programmed yet")
-  ##.Call(C_dolocking, do)
-  return(FALSE)
-}
 
 
 ## RM, SAVE, PB, RETURN, DEBUG, unlock deleted 

@@ -30,44 +30,43 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "AutoMiraculix.h"
 
 
-SEXP matrix_coding_start23(Uint individuals, Uint snps, SEXP G);
-SEXP matrix_coding23(Uint *M, Uint snps, Uint individuals, snpcoding method);
-
 
 SEXP get_matrix2(SEXP SNPxIndiv);
-SEXP matrix_coding_start2(Uint individuals, Uint snps, SEXP file);
-void matrix_coding2(Uint *SNPxIndiv, Uint start_individual, Uint end_individual,
+SEXP matrix_start2(Uint snps, Uint individuals, SEXP file);
+void coding2(Uint *SNPxIndiv, Uint start_individual, Uint end_individual,
 		    Uint start_snp, Uint end_snp, Uint Mnrow,
 		    SEXP Ans, double *G);
-Uint *Align2(SEXP Code, Uint nr, bool test);
 void Init2();
+Uint BytesPerBlock2();
 Uint CodesPerBlock2();
-Uint UnitsPerIndiv2(Uint snps);
+Uint BitsPerCode2();
+//Uint UnitsPerIndiv2(Uint snps);
 Ulong sumGeno2(Uint *S, Uint snps, Uint individuals);
 void haplo2geno2(Uint * SNPxIndiv, Uint snps, Uint individuals, Uint, Uint *A);
 Ulong sumGeno2(Uint *S, Uint snps, Uint individuals);
-void matrix2_mult(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A);
+void crossprod2(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A);
 SEXP allele_freq2(SEXP SNPxIndiv);
 SEXP get_matrixN_2(SEXP SNPxIndiv, SEXP Snps);
 void zeroNthGeno2(SEXP SNPxIndiv, SEXP Snps);
-void ReUseAsTwoBit(SEXP Code);
+void genoVector2(SEXP Z, SEXP V, double *ans);
+void vectorGeno2(SEXP V, SEXP Z, double *ans);
 
-
-void matrix_coding3(Uint *SNPxIndiv, Uint start_individual, Uint end_individual,
-		    Uint start_snp, Uint end_snp, Uint Mnrow,
-		    SEXP Ans, double *G);
+void coding3(Uint *SNPxIndiv, Uint start_individual, Uint end_individual,
+	     Uint start_snp, Uint end_snp, Uint Mnrow, SEXP Ans, double *G);
 SEXP get_matrix3(SEXP SNPxIndiv);
-SEXP matrix_coding_start3(Uint individuals, Uint snps, SEXP file);
+SEXP matrix_start3(Uint snps, Uint individuals, SEXP file);
 
 Uint *Align3(SEXP Code, Uint nr, bool test);
 
 void Init3();
+Uint BytesPerBlock3();
 Uint CodesPerBlock3();
 Uint UnitsPerIndiv3(Uint snps);
+Uint BitsPerCode3();
 Ulong sumGeno3(Uint *S, Uint snps, Uint individuals);
 void haplo2geno3(Uint * SNPxIndiv, Uint snps, Uint individuals, Uint, Uint *A);
 Ulong sumGeno3(Uint *S, Uint snps, Uint individuals);
-void matrix3_mult(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A);
+void crossprod3(Uint * SNPxIndiv, Uint snps, Uint individuals, double *A);
 SEXP allele_freq3(SEXP SNPxIndiv);
 SEXP get_matrixN_3(SEXP SNPxIndiv, SEXP Snps);
 void zeroNthGeno3(SEXP SNPxIndiv, SEXP Snps);

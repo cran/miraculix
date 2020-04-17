@@ -25,8 +25,28 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 const char // muss in separater Zeile sein
 // nachfolgende Zeile eingerueckt um 0 oder 2 Zeichen
-*SNPCODING_NAME[nr_snpcoding] = {
-  "Shuffle", "TwoBit", "ThreeBit", "Hamming2", "Hamming3", "NoSNPcoding",
-  "NoSNPcodingR", "AutoCoding", "Haplo"},
+*SNPCODING_NAMES[nr_snpcoding] = {
+  "AutoCoding", "NoSNPcodingR", "NoSNPCodingAVX", "NoSNPcoding",
+  "ThreeBit","Hamming2",
+  "Hamming3", "Shuffle", "Shuffle256", "TwoBit", "Packed",
+  "Packed256", "Multiply", "Multiply256",
+  "CaseCount", 
+  "unused", "unused", "unused", "unused", "unused",
+  "unused", "unused", "unused", "unused", "unused",
+  "unused", "unused", "unused", "unused", "unused",
+  "Haplo", "unknown"},
   
-*WHAT_NAMES[LAST_WHAT + 1] = {"haplo vector", "geno matrix"};
+  *INFO_NAMES[INFO_LAST + 1] = {
+  "version", "snps", "individuals", "addr0", "addr1",
+  "align0", "align1", "sumgeno", "sumgenoE9", "method",
+  "alignment", "isSNPxInd", "bitspercode", "bytesperblock", "codesperblock",
+  "header", "DoubledIndividuals", "leadingcolumns", "memInUnits0","meminUnits1",
+  "AlignedUnits0", "AlignedUnits1", "unitsperindiv", "unused", "unused",
+  "unused", "unused", "unused","unused", "unused",  // 30
+  "unused","unused", "unused", "unused", "unused",
+  "unused","unused", "unused", "unused", "unused",  // 40
+  "unused","unused", "unused", "unused", "unused",
+  "unused","unused", "unused", "unused", "unused", // 50
+  "unused","unused", "unused", "unused", "unused",
+  "unused","unused", "unused", "unused", "unused", // 60
+  "unused","unused", "unused", "unused"}; // 64

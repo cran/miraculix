@@ -28,10 +28,7 @@ decodeHaplo <- function(CM, indiv=integer(0),
                         sets=1:2,
                         IndividualsPerColumn=TRUE,
                         DoubledIndividuals=TRUE) {## method checked in C
- 
-  if (!is(CM, HAPLOMATRIX)) stop("matrix not a '", HAPLOMATRIX, "'")
-
-  .Call(C_decodeHaplo, CM, as.integer(indiv), as.integer(sets),
+   .Call(C_decodeHaplo, CM, as.integer(indiv), as.integer(sets),
         IndividualsPerColumn, DoubledIndividuals)
 }
 
@@ -48,9 +45,6 @@ haplomatrix <- function(M,  # N,
 
 ## geno functions
 haplo2geno <- function(CM) {## method checked in C
-  if (dolocking(NULL))
-    stop("if 'dolocking' then implicite re-coding is not possible.")
-  if (!is(CM, HAPLOMATRIX)) stop("matrix not a '", HAPLOMATRIX, "'")
   .Call(C_haplo2geno, CM)  # CM coded geno matrix
 }
 
@@ -58,12 +52,20 @@ haplo2geno <- function(CM) {## method checked in C
 decodeGeno <- function(SNPxIndiv, snps, do.centering=FALSE) {
   if (!missing(snps))
     return(decodeNthGeno(SNPxIndiv, snps=snps, do.centering=do.centering))
+
   if (is(SNPxIndiv, GENOMICMATRIX)) {
-    method <- attr(SNPxIndiv, "method")
+     
     if (is.character(SNPxIndiv)) {
       snpXindiv <-.Call(C_file_get, SNPxIndiv)
       attr(snpXindiv, "filename") <- as.character(SNPxIndiv)
-    } else snpXindiv <-.Call(C_matrix_get, SNPxIndiv)
+    } else {
+      if (attr(SNPxIndiv, "information")[METHOD + 1]
+          %in% c(NoSNPcodingR, NoSNPcodingAVX)) {
+        snpXindiv <- SNPxIndiv
+        if (do.centering) storage.mode(snpXindiv) <- "integer"
+      } else
+        snpXindiv <-.Call(C_matrix_get, SNPxIndiv)
+    }
   } else if (is.matrix(SNPxIndiv)) {
     snpXindiv <- SNPxIndiv
     d <- dim(snpXindiv)
@@ -84,6 +86,9 @@ copyGeno <-function(SNPxIndiv) {
   if (is.matrix(SNPxIndiv)) return(SNPxIndiv + 0L)
   stopifnot(is(SNPxIndiv, GENOMICMATRIX))
   if (is.character(SNPxIndiv)) return(paste0("", SNPxIndiv))
+  if (attr(SNPxIndiv, "information")[METHOD+1] %in%
+      c(NoSNPcodingR, NoSNPcodingAVX) )
+    return(SNPxIndiv + 0L)
   .Call(C_copyGeno, SNPxIndiv)
 }
 
@@ -101,9 +106,6 @@ genomicmatrix <- function(snps, individuals, file.type,
                           DoubledIndividuals, leadingcolumns,
                           loading = TRUE,
                           ...) {
-  if (dolocking(NULL))
-    stop("if 'dolocking' then implicite coding is not possible.")
-
   if (is(snps, GENOMICMATRIX)) {
     warning("'snps' is already of class '", GENOMICMATRIX,
             "'. Its original definition is kept.");
@@ -112,11 +114,11 @@ genomicmatrix <- function(snps, individuals, file.type,
     return(snps)
   }
 
-  info <- NULL
-  if (is(snps, HAPLOMATRIX)) {
-    if (is.character(snps)) info <- attr(snps, "information") ## treat as if
+  info <- attr(snps, "information")## treat as if
     ##                                         file name + file.type were given
-    else {
+
+  if (is(snps, HAPLOMATRIX) && !is.character(snps)) {
+    if (!is.character(snps)) {
       if (length(list(match.call())) > 2)
         stop("further arguments may not be given")
       return(haplo2geno(snps))
@@ -128,10 +130,9 @@ genomicmatrix <- function(snps, individuals, file.type,
       stop("if 'individuals' is given exactly 'snps' and 'individuals' must be given.")
      if (!is.numeric(snps) || length(snps) != 1)
       stop("'snps' and 'individuals' must be integers that give the size of the SNP matrix.")
-
     return (.Call(C_createSNPmatrix, as.integer(snps), as.integer(individuals)))
   }
- 
+
   if (length(list(...)) > 0) {
     RFoptOld <- RFoptions(##LOCAL=1,
                           SAVEOPTIONS="genetics", ...)
@@ -142,45 +143,52 @@ genomicmatrix <- function(snps, individuals, file.type,
   if (method == AutoCoding) method <- .Call(C_getAutoCoding)
 
   if (is.numeric(snps) || is.logical(snps)) {
-    if (method == NoSNPcodingR) {
+    if (method %in% c(NoSNPcodingR, NoSNPcodingAVX)) {
       sumgeno <- sum(snps)
       mem <- length(snps)
-      info <- c(what = GENOMATRIX,              ## 0 
+      info <- c(version = CURRENT_VERSION,
                 snps = nrow(snps),      ## 1
                 individuals=ncol(snps),
                 addr0=0,
                 addr1=0,
-                align=0,                ## 5
+                align0=0,                ## 6
                 align1=0,
-                sumgeno= as.integer(sumgeno %% 1e9),
-                sumgenoE9=as.integer(sumgeno / 1e9),
-                unused = NA, ###
-                unused2 = NA,
-                isSNPxInd = TRUE,       ## 9
+                sumgeno= sumgeno %% 1e9,
+                sumgenoE9=sumgeno / 1e9,
+                method = method,
+                alignment = 0,
+                isSNPxInd = TRUE,       ## 12
                 bitspercode = 32,
                 bytesperblock = 4,
                 codesperblock = 1,
-                header=NA,              ## 15
+                header=NA,              ## 16
                 DoubledIndividuals=NA,
                 leadingcolumns=NA,
-                memInUnits0 = as.integer(mem %% 1e9),
-                meminUnits1 = as.integer(mem / 1e9),
-                AlignedUnits0 = as.integer(mem %% 1e9),
-                AlignedUnits1 = as.integer(mem / 1e9)
+                memInUnits0 = mem %% 1e9,
+                meminUnits1 = mem / 1e9,
+                AlignedUnits0 = mem %% 1e9,
+                AlignedUnits1 = mem / 1e9,
+                unitsperindiv = nrow(snps),
+                rep(NA, INFO_LAST - INFO_GENUINELY_LAST)
                 )
-      stopifnot(length(info) == INFO_LAST + 1)
+      stopifnot(length(info) == INFO_LAST + 1)      
+      stopifnot(all(names(info)[1:(INFO_GENUINELY_LAST+1)] ==
+                INFO_NAMES[1:(INFO_GENUINELY_LAST+1)]))
       storage.mode(info) <- "integer"
       attr(snps, "information") <- info
-      ##attr(snps, "coding") =  as.character(NULL)
-      attr(snps, "method") <- method
       class(snps) <- GENOMICMATRIX
-  } else snps <- .Call(C_matrix_coding, snps)
+    } else snps <- .Call(C_matrix_coding, snps)
     return(snps)
   }
 
   if (!is.character(snps)) stop("'snps' is expected to be a file name.")
   object <- snps
-  individuals <- snps <- NA
+  
+  if (length(info) == 0) individuals <- snps <- NA
+  else {
+    individuals <- info["individuals"]
+    snps <- info["snps"]
+  }
   if (missing(file.type)) {
     split <- strsplit(object, "\\.")[[1]]
     file.ext <-  c("txt", "bgl", "phased", "tped", "ped", "bed")
@@ -239,40 +247,43 @@ genomicmatrix <- function(snps, individuals, file.type,
   object <- filename <- as.character(object)
   if (length(info) == 0)
     info <- c(
-        what = NA,
-        snps = as.integer(snps),# get rid of any attributes
+        version = CURRENT_VERSION, # 0
+        snps = snps,# get rid of any attributes
         individuals=as.integer(individuals),# get rid of any attributes
-        addr0=0,
+        addr0=0, #3
         addr1=0,
-        align=0,
+        align0=0, #5
         align1=0,
-        sumgeno=0,
+        sumgeno=0, #7
         sumgenoE9=0,
-        unused = NA, 
-        unused2 = NA,
-        isSNPxInd = as.integer(IndividualsPerColumn), # get rid of name attribute
-        bitspercode = NA, 
+        method = if (loading) UnknownSNPcoding else method, #9
+        alignment = 0,
+        isSNPxInd = as.integer(IndividualsPerColumn),# get rid of name attribute
+        bitspercode = NA, #12
         bytesperblock = NA,
         codesperblock = NA,
-        header=header,
+        header=as.integer(header), # 15
         DoubledIndividuals=as.integer(DoubledIndividuals),#get rid of attributes
         leadingcolumns=as.integer(leadingcolumns),#get rid of attributes
         memInUnits0 = NA,
         meminUnits1 = NA,
-        AlignedUnits0 = NA,
-        AlignedUnits1 = NA
+        AlignedUnits0 = NA, # 20
+        AlignedUnits1 = NA,
+        unitsperindiv = snps, # 22
+        rep(NA, INFO_LAST - INFO_GENUINELY_LAST)
     )
   stopifnot(length(info) == INFO_LAST + 1)
+  stopifnot(all(names(info)[1:(INFO_GENUINELY_LAST+1)] ==
+                INFO_NAMES[1:(INFO_GENUINELY_LAST+1)]))
   storage.mode(info) <- "integer"
   attr(object, "information") <- info
   attr(object, "coding") <-  as.character(coding)
   if (!loading) {
-    attr(object, "method") <- method
     class(object) <- GENOMICMATRIX
     return(object)
   }
 
-  object <- .Call(C_file_get, object);
+  object <- .Call(C_file_get, object)
   attr(object, "filename") <-  filename
   return(object)
 }
@@ -316,23 +327,28 @@ relationshipMatrix <- function(SNPxIndiv, ...) {
 
   if (!is(SNPxIndiv, GENOMICMATRIX) || is.character(SNPxIndiv))
     SNPxIndiv <- genomicmatrix(SNPxIndiv)
-  method <- attr(SNPxIndiv, "method")
+  method <- attr(SNPxIndiv, "information")[METHOD + 1]
 
-  if (opt$verbose) cat("method =", SNPCODING_NAME[method + 1],
+  if (opt$verbose) cat("method =", SNPCODING_NAMES[method + 1],
 		       "using", opt$cores, "core(s).\n")
   
-  if (method == NoSNPcodingR) {
+  if (method %in% c(NoSNPcodingR, NoSNPcodingAVX)) {
     p <- rowMeans(SNPxIndiv)
     if (!is.na(centered) && centered) SNPxIndiv <- SNPxIndiv - p
-    if (RFopt$genetics$normalized) SNPxIndiv <- SNPxIndiv / sqrt(sum(p * (1 - p / 2)))
-    A <- base::crossprod(SNPxIndiv)
+    if (RFopt$genetics$normalized)
+      SNPxIndiv <- SNPxIndiv / sqrt(sum(p * (1 - p / 2)))
+    if (method == NoSNPcodingR) A <- base::crossprod(SNPxIndiv)
+    else {
+       A <- if (is.double(SNPxIndiv)) {message("This is a slow version of miraculix. Better use the github version of miraculix.");base::crossprod(SNPxIndiv)}
+           else .Call(C_crossprodInt, SNPxIndiv, SNPxIndiv, as.integer(-1))
+    }
   }
 
-  else A <- .Call(C_matrix_mult, SNPxIndiv)
+  else A <- .Call(C_crossprod, SNPxIndiv)
 
   if (is.na(centered)) {
     p  <- .Call(C_get_centered)
-    pA <- vectorGeno(p, SNPxIndiv=SNPxIndiv, do.centering=FALSE)
+    pA <- vectorGeno(V=p, SNPxIndiv=SNPxIndiv, do.centering=FALSE)
     A <- A - pA - base::'%*%'(rep(1, length(pA)), t(pA)) + sum(p^2)
   }
   attr(A, "centered") <- centered
@@ -351,10 +367,12 @@ vectorGeno <- function(V, SNPxIndiv, do.centering=FALSE, decode=TRUE) {
 
   if (is.matrix(SNPxIndiv)) return(base::'%*%'(V, SNPxIndiv))
   stopifnot(is(SNPxIndiv, GENOMICMATRIX))
-  method <- attr(SNPxIndiv, "method")
+  method <- attr(SNPxIndiv, "information")[METHOD + 1]
   if (is.character(SNPxIndiv)) return(.Call(C_dot_file, SNPxIndiv,as.double(V)))
-  else if (method == Shuffle && !decode) .Call(C_vectorGeno, V, SNPxIndiv)
-    as.vector(base::'%*%'(V, as.matrix(SNPxIndiv)))
+  else if (.Call(C_is2BitMethod, method) && !decode)
+    return(.Call(C_vectorGeno, V, SNPxIndiv))
+  
+  as.vector(base::'%*%'(V, as.matrix(SNPxIndiv)))
 }
 
 
@@ -362,24 +380,26 @@ genoVector <- function(SNPxIndiv, V, do.centering=FALSE) {
   if (do.centering) stop("centering not programmed yet")
   if (is.matrix(SNPxIndiv)) return(as.vector(base::'%*%'(SNPxIndiv, V)))
   stopifnot(is(SNPxIndiv, GENOMICMATRIX))
-  method <- attr(SNPxIndiv, "method")
+  method <- attr(SNPxIndiv, "information")[METHOD + 1]
   if (is.character(SNPxIndiv)) return(.Call(C_file_dot, SNPxIndiv,as.double(V)))
-  else if (method == Shuffle) return(.Call(C_genoVector, SNPxIndiv, V))
+  else if (.Call(C_is2BitMethod, method)) {
+    return(.Call(C_genoVector, SNPxIndiv, V))
+  }
   base::'%*%'(as.matrix(SNPxIndiv), V)
 }
 
 
-solveRelMat <- function(A, tau, vec, betahat, destroy_A=FALSE) {
+solveRelMat <- function(A, tau, vec, betahat = NULL, destroy_A=FALSE) {
   ## if not destroyed, more memory is consumed
   ## implements ( t(Z) Z + tau \1_{ind x ind} )^{-1} %*% vec
-  stopifnot(length(tau) == 1 && length(betahat) ==1)
-  .Call(C_solveRelMat, A, as.double(tau), as.double(vec), as.double(betahat),
-	destroy_A)
+  stopifnot(length(tau) == 1 && (is.null(betahat) || length(betahat) == 1))
+  .Call(C_solveRelMat, A, as.double(tau), as.double(vec),
+        if (!is.null(betahat)) as.double(betahat),
+        destroy_A)
 }
 
                 
 SNPeffect <- function(SNPxIndiv, vec, centered=TRUE, tau=0) {
-  ismatrix <- is.matrix(SNPxIndiv)
   snpXind <- SNPxIndiv
   if (!is(snpXind, GENOMICMATRIX)) snpXind <- genomicmatrix(snpXind)
 
@@ -387,9 +407,7 @@ SNPeffect <- function(SNPxIndiv, vec, centered=TRUE, tau=0) {
   if (tau != 0) rM <- rM + diag(nrow(rM)) * tau ## ehemals eps
   rM <- solvex(rM, vec)
 
-  method <- attr(SNPxIndiv, "method")
-  return(if (ismatrix) base::'%*%'(SNPxIndiv, rM)
-         else genoVector(SNPxIndiv, rM))
+  genoVector(SNPxIndiv, rM)
 }
 
 

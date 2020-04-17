@@ -24,20 +24,24 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 #define BitsPerCode 2L
-#define PseudoSSE 1     // in case IntrinsicBase does not return anything better
+#define PlainInteger256
 
-#include <inttypes.h> 
-#include "IntrinsicsBase.h"
 #include "intrinsics.h"
 #include "miraculix.h"
 #include <General_utils.h>
-#include "xport_import.h"
+#include "dummy.h"
+
+#include <inttypes.h> 
+#include "Vector.matrix.h"
 #include "AutoMiraculix.h"
 #include "options.h"
 #include "Haplo.h"
 #include "haplogeno.h"
+#include "xport_import.h"
+//#include "shuffle.h"
+#include "align.h"
 
-//#define DO_FLOAT 1
+//#define DO_FLOAT 1  // must be completely re-checked if defined
 
 // #define DO_PARALLEL 1 // done by basic_utils.h
 
@@ -52,43 +56,41 @@ Uint zaehler = 0;
 //
 #define show(X)
 // void show(const char *s) {  if (debugging) PRINTF("%.50s", s); }
-
 				   
+static bool doshow=true;
+void checkMethod(snpcoding method) {
 
-INLINER
+  if (!is256(method)) 
+    ERR1("MoBPS does not work with method '%.20s'\n", SNPCODING_NAMES[method]);
 
-
+  if (method == TwoBit) {
+    if (doshow) {
+      PRINTF("MoBPS will run much faster and with a minimum of memory if 'Shuffle' or 'Shuffle256' is used as 'snpcoding'\n");
+      doshow = false;
+    }
+  } else if (method != Shuffle256) {
+      if (doshow) {
+      PRINTF("MoBPS will run twice as fast if 'Shuffle256' is used as 'snpcoding'\n");
+      doshow = false;
+    }
+  }
+  
+}
+ 
 BlockType BitMaskStart[CodesPerBlock], BitMaskEnd[CodesPerBlock];
 bool MoBPSNotInit = true;
 void InitMoBPS() {
   if (!MoBPSNotInit) BUG;
   MoBPSNotInit = false;
-  snpcoding method = (snpcoding) GLOBAL.genetics.method;
-  if (method != Shuffle) {
-#if defined SSE
-    PRINTF("MoBPS will run much faster and with a minimum of memory if 'Shuffle' is used as 'snpcoding'\n");
-#else
-    if (method != TwoBit) {
-      GLOBAL.genetics.method = method = TwoBit;
-      PRINTF("The default value of 'RFoption(snpcoding=...)' in miraculix, which is 'ThreeBit' or 'Hamming2' in case SSSE3 is not available, is overwritten by the default value of 'MoBPS', which is 'TwoBit'.\nNote that 'MoBPS' will run much faster if 'miraculix' is compiled with SSSE3.\n");
-    } else {
-      PRINTF("MoBPS will run with a minimum of memory if 'TwoBit' is used as 'snpcoding'\n");
-    }
-#endif
-  }
-  
   assert(BytesPerBlock == sizeof(BlockType0));
- 
-  BlockType Einsen;
-  SET32(Einsen, 0xFFFFFFFF);
-  BlockUnitType *BME = (BlockUnitType*) BitMaskEnd;
-  BME->u32[0] = 0x03;
+  BlockType Einsen = 0xFFFFFFFF;
+  BitMaskEnd[0] = 0x03;
 
   for (Uint k=1; k<CodesPerBlock; k++) {
-    XOR(BitMaskStart[k], BitMaskEnd[k-1], Einsen); // not
+    //    XOR(BitMaskStart[k], BitMaskEnd[k-1], Einsen); // not
+    BitMaskStart[k] = BitMaskEnd[k-1] ^ Einsen; // not
     BitMaskEnd[k] = BitMaskEnd[k-1];
-    BME = (BlockUnitType*) BitMaskEnd + k;
-    BME->u32[k % UnitsPerBlock] |= 0x03 << (BitsPerCode * (k / UnitsPerBlock));
+    BitMaskEnd[k] |= 0x03 << (BitsPerCode * k);
   }
   BitMaskStart[0] = Einsen;
 }
@@ -96,6 +98,7 @@ void InitMoBPS() {
 
 void assert_MoBPS() {
   if (MoBPSNotInit) InitMoBPS();
+  checkMethod((snpcoding) GLOBAL.genetics.method);
 }
 
 
@@ -120,7 +123,6 @@ void assert_MoBPS() {
 #define PATTERN_HAPLO (MAX_HAPLO - 1)
 
 
-
 void INLINE decodeOrigin(Uint x, Uint *ans) {
   ans[ORIGIN_HAPLO] = (x & PATTERN_HAPLO);
   x >>= BITS_HAPLO;
@@ -142,7 +144,6 @@ SEXP decodeOrigins(SEXP M, SEXP Line) {
   decodeOrigin(Inti(M, line - 1), ans);
   for (Uint i=0; i<4; ans[i++]++);
   UNPROTECT(1);
-  if (PRESERVE) R_PreserveObject(Ans);
   return Ans;
 }
 
@@ -163,7 +164,20 @@ SEXP codeOrigins(SEXP M) {
     *sex = gen + nrow,				\
     *nr = sex + nrow,				\
     *haplo = nr + nrow					       
-    
+
+#ifdef SCHLATHERS_MACHINE  
+#define CONTROL \
+    Uint control[4];							\
+    decodeOrigin(ans[i], control);					\
+    if (control[0]+1 != g || control[1]+1 != s || control[2]+1 != n ||	\
+	control[3]+1 != H) {						\
+      /*	p rintf("i=%d: generation:%d->%d sex:%d->%d nr:%d->%d haplo:%d->%d\n", i, g, control[0], s, control[1], n, control[2], H, control[3]); */ \
+      BUG;								\
+    }
+#else
+  #define CONTROL
+#endif  
+  
 #define DO2								\
   for (Uint i=0; i<nrow; i++) {						\
     Uint g = (Uint) gen[i],						\
@@ -177,37 +191,21 @@ SEXP codeOrigins(SEXP M) {
 		 s - 1) << BITS_INDIVIDUALS) +				\
 	       n - 1) << BITS_HAPLO) +					\
       H - 1;								\
-      									\
-    Uint control[4];							\
-    decodeOrigin(ans[i], control);					\
-    if (control[0]+1 != g || control[1]+1 != s || control[2]+1 != n ||	\
-	control[3]+1 != H) {						\
-      /*	p rintf("i=%d: generation:%d->%d sex:%d->%d nr:%d->%d haplo:%d->%d\n", i, g, control[0], s, control[1], n, control[2], H, control[3]); */ \
-      BUG;								\
-    }									\
+    CONTROL								\
   }
 
   
   if (TYPEOF(M) == REALSXP) {
     DO1(double, REAL);
-#ifdef DO_PARALLEL
-#pragma omp parallel for num_threads(CORES)   
-#endif
     DO2   
       } else if (TYPEOF(M) == INTSXP) {
     DO1(int, INTEGER);
-#ifdef DO_PARALLEL
-#pragma omp parallel for num_threads(CORES)  
-#endif
     DO2   
       } else BUG;
   
   UNPROTECT(1);
-  if (PRESERVE) R_PreserveObject(Ans);
   return Ans;
 }
-
-
 
 
 // population
@@ -215,7 +213,7 @@ SEXP codeOrigins(SEXP M) {
 #define BREEDING 1
 
 // info
-#define INFO_DUMMY 0
+#define INFO_INFOHAPLO 0
 #define NSNPS 2
 #define POSITION 3
 #define SNP_POSITION 5
@@ -240,59 +238,30 @@ SEXP codeOrigins(SEXP M) {
 #define MAX_CHROM 100
 
 
-
-Uint INLINE GetGenoCode(BlockType0 *code, Uint pos) {
-  Uint block = pos / CodesPerBlock,
-    unit = pos % UnitsPerBlock,
-    elmt = (pos % CodesPerBlock) / UnitsPerBlock;
-  BlockUnitType *c = (BlockUnitType*) code + block;
-  return (c[0].u32[unit] >> (2 * elmt)) & 0x00000003;
-}
-
-
-void INLINE PutGenoCode(Uint value, Uint pos, BlockType0 *code) {
-  Uint 
-    unit = pos % UnitsPerBlock,
-    elmt = (pos % CodesPerBlock) / UnitsPerBlock,
-    shift = 2 * elmt;
-  BlockUnitType *c = ((BlockUnitType*) code) + pos / CodesPerBlock;
-
-  c[0].u32[unit] =
-    (c[0].u32[unit] & (0xFFFFFFFF xor (0x00000003 << shift)))//clear
-    | (value << shift);
-}
-
-
 Uint INLINE GetHaploCode(BlockType0 *code, Uint pos, Uint haplo) {
-  Uint unit = pos % UnitsPerBlock,
-    elmt = (pos % CodesPerBlock) / UnitsPerBlock; 
-  BlockUnitType *c = (BlockUnitType*) code + pos / CodesPerBlock; 
+  Uint elmt = pos % CodesPerBlock; 
   assert(haplo <= 1);
   assert(elmt < CodesPerUnit);
-  return (c[0].u32[unit] >> (2 * elmt + haplo)) & 0x00000001;
+  return (code[pos / CodesPerBlock] >> (2 * elmt + haplo)) & 0x00000001;
 }
 
 
+/*
 void INLINE PutHaploCode(Uint value, Uint pos, Uint haplo, BlockType0 *code) {
-  Uint 
-    unit = pos % UnitsPerBlock,
-    elmt = (pos % CodesPerBlock) / UnitsPerBlock,
-    shift = 2 * elmt + haplo;
-  BlockUnitType *c = (BlockUnitType*) code + pos / CodesPerBlock; 
-  if (value) c[0].u32[unit] |= (0x00000001 << shift);
-  else c[0].u32[unit] &= 0xFFFFFFFF xor (0x00000001 << shift);
+  Uint elmt = pos % CodesPerBlock;
+  BlockType shift = 0x00000001 << (2 * elmt + haplo);
+  BlockType *c = code + pos / CodesPerBlock; 
+  if (value) *c |= shift;
+  else *c &= 0xFFFFFFFF xor shift;
 }
+*/
 
 
 void INLINE PutHaploOne(Uint pos, Uint haplo, BlockType0 *code) {
-  Uint 
-    unit = pos % UnitsPerBlock,
-    elmt = (pos % CodesPerBlock) / UnitsPerBlock,
-    shift = 2 * elmt + haplo;
-  BlockUnitType *c = (BlockUnitType*) code + pos / CodesPerBlock; 
-  c[0].u32[unit] |= (0x00000001 << shift);
+  Uint elmt = pos % CodesPerBlock;
+  BlockType *c = code + pos / CodesPerBlock; 
+  *c |= 0x00000001 << (2 * elmt + haplo);
 }
-
 
   
 Uint getNrSNPposition(double cur_recomb, double *position, Uint Min, Uint Max) {
@@ -322,8 +291,8 @@ Uint getNrSNPposition(double cur_recomb, double *position, Uint Min, Uint Max) {
 #define ASSERT(WHERE,WHAT,NAME)						\
   assert(STRCMP(CHAR(STRING_ELT(getAttrib(WHERE, R_NamesSymbol), WHAT)), \
 		NAME) == 0);
-int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
-		 Rint From_SNP, Rint To_SNP, SEXP Select, BlockType0 *ans){
+SEXP IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
+	       Rint From_SNP, Rint To_SNP, SEXP Select, Uint *ans){
   
   //  zaehler ++; printf("%d\n", zaehler);
   Uint
@@ -367,37 +336,17 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
   
   ASSERT(info, NSNPS, "snp");
   Uint n_snps;
-  SEXP Dummy = VECTOR_ELT(info, INFO_DUMMY);
+  SEXP InfoHaplo = VECTOR_ELT(info, INFO_INFOHAPLO);
 
-  //   if (zaehler >= 11424) printf("AB\n");
-#ifdef DOCH_AUF_INFO_ABSPEICHERN  
-  if (TYPEOF(Dummy) != INTSXP || length(Dummy) == 0){
-    Uint mem = n_chromP1 + n_chromP1;
-    SEXP dummy;
-    PROTECT(dummy = allocVector(INTSXP, mem));    
-    Uint *snps_perchrom = (Uint*) INTEGER(VECTOR_ELT(info, NSNPS)),
-      *length_prec_chroms = (Uint*) INTEGER(dummy) + 0,
-      *totalsnps_prec_chroms = (Uint*) INTEGER(dummy) + n_chromP1;
-    length_prec_chroms[0] = 0;
-    totalsnps_prec_chroms[0] = 0;
-    for (Uint c=1; c<=n_chrom; c++) {
-      length_prec_chroms[c] =  length_prec_chroms[c-1] + LengthChrom[c-1];
-      totalsnps_prec_chroms[c] = totalsnps_prec_chroms[c-1] +
-	snps_perchrom[c-1];
-    }
-    SET_VECTOR_ELT(info, INFO_DUMMY, dummy);
-    UNPROTECT(1);
-  }
-  Uint
-    *length_prec_chroms = (Uint*) INTEGER(VECTOR_ELT(info, INFO_DUMMY)) + 0,
-    *totalsnps_prec_chroms = length_prec_chroms + n_chromP1;
-#else
-  if (TYPEOF(Dummy) != LGLSXP) {
-    SEXP dummy;
-    PROTECT(dummy = allocVector(LGLSXP, 1));
-    LOGICAL(dummy)[0] = true;
-    SET_VECTOR_ELT(info, INFO_DUMMY, dummy);
-    UNPROTECT(1);  
+  if (TYPEOF(InfoHaplo) != INTSXP || length(InfoHaplo) != INFO_LAST + 1) {
+    PROTECT(InfoHaplo = allocVector(INTSXP, INFO_LAST + 1));
+    int *infoHaplo = INTEGER(InfoHaplo);
+    for (int i=0; i<=INFO_LAST; infoHaplo[i++] = NA_INTEGER);
+    infoHaplo[METHOD] = Haplo;
+    snpcoding method = (snpcoding) GLOBAL.genetics.method;
+    if (!is256(method)) ERR1("'%.20s'not allowed", SNPCODING_NAMES[1 + method] );
+    SET_VECTOR_ELT(info, INFO_INFOHAPLO, InfoHaplo);
+    UNPROTECT(1);    
   }
    
   double length_prec_chroms[MAX_CHROM + 1];
@@ -412,9 +361,7 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
     totalsnps_prec_chroms[c] = totalsnps_prec_chroms[c-1] +
       snps_perchromint[c-1];
   }
-#endif
 
-  // if (zaehler >= 11424)  printf("ABC\n");
   n_snps = totalsnps_prec_chroms[n_chrom];
   assert(n_snps > 0);
   Rint fromSNP = From_SNP - 1,
@@ -434,8 +381,10 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
       cur_nsnps +=
 	Selectint[k] > (Uint) fromSNP && Selectint[k] <= (Uint) toSNP_P1;
   } else cur_nsnps = 1L + MIN(n_snps - 1L, (Uint) toSNP) - fromSNP;
-  if (ans == NULL) return cur_nsnps;
-  Uint blocks = Blocks(cur_nsnps);
+  INTEGER(InfoHaplo)[CURRENT_SNPS] = cur_nsnps;
+  
+  if (ans == NULL) return InfoHaplo;
+  Uint unitsPerIndiv = GetUPI(cur_nsnps, Haplo);
 
   ASSERT(info, SNPS_EQUIDIST, "snps.equidistant");
   bool equidist = (bool) LOGICAL(VECTOR_ELT(info, SNPS_EQUIDIST))[0];
@@ -452,8 +401,9 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
   ToInt(Sex);
   ToInt(Nr);
 
-  //  if (zaehler >= 11424)  printf("ABD\n");
-  for (Uint i=0; i<individuals; i++) {
+  BlockType NullEins[2] = { 0x55555555, 0xAAAAAAAA};
+
+  for (Ulong i=0; i<individuals; i++) {
     //    print("i=%d %d\n", i, individuals);
     //    printf("%d %d\n", i, individuals);
     if (length(breeding) < (int) Generationint[i]) ERR("value of 'generation' too large.");
@@ -465,10 +415,7 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
     if (length(s) < (int) Nrint[i]) ERR("value of 'nr' too large..");  
     SEXP
       Indiv = VECTOR_ELT(s, Nrint[i]-1);
-    BlockType *haplo = ans + i * blocks,
-      NullEins[2];
-    SET32(NullEins[0], 0x55555555);
-    SET32(NullEins[1], 0xAAAAAAAA);
+    BlockType *haplo = (BlockType0 *) (ans + i * unitsPerIndiv);
     for (Uint hapnr=0; hapnr<=1; hapnr++) {
       //printf("h=%d \n",  hapnr);
       //      if (zaehler >= 11424) printf("haplo=%u\n", hapnr);      
@@ -557,11 +504,12 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
 	    PROTECT(coded_haplo = codeHaplo2(VECTOR_ELT(Orig, HAPLOTYP1),
 					     VECTOR_ELT(Orig, HAPLOTYP2)));
 	    SET_VECTOR_ELT(Orig, CODEDHAPLO, coded_haplo);
+	    n_protect++;
 	  }
  
 	  //if (zaehler >= 11424) printf("ok\n");
 	  BlockType
-	    *o_haplo = (BlockType0*) DoAlign(coded_haplo, ALIGN_CODED, Haplo);
+	    *o_haplo = (BlockType0*) Align256(coded_haplo, ALIGN_CODED);
 	 
 	  //	  if (zaehler >= 11424 || zaehler >= 7220) printf("ok %d!\n", zaehler);
 	  //	  printf("her rre\n");
@@ -581,8 +529,7 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
 		o_rest = 1 + bis - op,
 		rest = CodesPerBlock - start;
 	      if (rest > o_rest) rest = o_rest;
-	      BlockType L1,
-		o_code = o_haplo[op / CodesPerBlock];
+	      BlockType o_code = o_haplo[op / CodesPerBlock];
 	      ////	      printf("rest = %d\n", rest);
 
 	      //  if (zaehler >= 11424)   printf("a\n");
@@ -598,28 +545,29 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
 		  while (pmutat < n_mutat && mutatint[pmutat] <= end) {
 		    //		    printf("%d %d\n", pmutat, n_mutat);
 		    Uint idx = (mutatint[pmutat] - 1) % CodesPerBlock;
-		    AND(L1 , BitMaskStart[idx], BitMaskEnd[idx]);
-		    XOR(o_code, o_code, L1);
+		    //  AND(L1 , BitMaskStart[idx], BitMaskEnd[idx]);
+		    //		    XOR(o_code, o_code, L1);
+		    o_code ^= BitMaskStart[idx] & BitMaskEnd[idx];
 		    pmutat++;
 		  }
 		  mutations = pmutat < n_mutat;
 		}
 	      }
 	      //  if (zaehler >= 11424) printf("xxxx\n");
-	      AND(L1, BitMaskStart[start], BitMaskEnd[start + rest - 1]);
-	      AND(L1, L1, NullEins[o_haplotype]);
-	      AND(o_code, o_code, L1);
+	      //   AND(L1, BitMaskStart[start], BitMaskEnd[start + rest - 1]);
+	      //   AND(L1, L1, NullEins[o_haplotype]);
+	      // AND(o_code, o_code, L1);
+	      o_code &= BitMaskStart[start] & BitMaskEnd[start + rest - 1] &
+		NullEins[o_haplotype];
 
-	      if (o_haplotype != hapnr) {
-		if (o_haplotype > hapnr) { SHR32(o_code, o_code, 1); }
-		else SHL32(o_code, o_code, 1);
+	      if (o_haplotype != hapnr) {		
+		// if (o_haplotype > hapnr) { SHR32(o_code, o_code, 1); }
+		// else SHL32(o_code, o_code, 1);
+		if (o_haplotype > hapnr) o_code >>= 1; else o_code <<= 1;
 	      }
 	      
-	      //   if (zaehler >= 11424) printf("fast ende %d\n", zaehler);
-	      OR(haplo[bnr], haplo[bnr], o_code);
-	      // printf("%d %ld\n", bnr, haplo[bnr]);
-	      //	      showblock((Uint*) haplo + bnr, 1);
-	      //  if (zaehler >= 11424) printf("ende\n");
+	      //OR(haplo[bnr], haplo[bnr], o_code);
+	      haplo[bnr] |= o_code;
 	      op += rest;
 	      p += rest; // p is now endpoint + 1 !
 	      q += rest;
@@ -631,7 +579,6 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
 		       von, bis, 
 		       op % CodesPerBlock, q % CodesPerBlock, zaehler,
 		       from, till, index, n_recomb);
-	      // BUG;
 	      // bitwise copying
 	      if (do_select) {
 		if (psel >= len_sel || cur_select != p) {
@@ -674,7 +621,7 @@ int IcomputeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
   FREEint(Nr); 
 
   
-  return 0;
+  return NULL;
 }
 
     
@@ -682,176 +629,79 @@ SEXP computeSNPS(SEXP population, SEXP Generation, SEXP Sex, SEXP Nr,
 		 SEXP From_SNP, SEXP To_SNP, SEXP Select, SEXP Geno){
   // printf("A\n");
   assert_MoBPS();
-  snpcoding method = (snpcoding) GLOBAL.genetics.method;
   bool geno = LOGICAL(Geno)[0];
   Uint individuals = length(Generation);
   //  printf("B\n");
-  Uint snps = IcomputeSNPS(population, Generation, Sex, Nr,
+  SEXP Popinfo;
+  PROTECT(Popinfo = IcomputeSNPS(population, Generation, Sex, Nr,
 			   INTEGER(From_SNP)[0], INTEGER(To_SNP)[0],
-			   Select, NULL),
-    blocks = Blocks(snps),
-    unitsPerIndiv = blocks * UnitsPerBlock;
-  //  printf("C\n");
+				 Select, NULL));
+  Uint *popinfo = (Uint*) INTEGER(Popinfo),
+    snps = popinfo[CURRENT_SNPS];
+  snpcoding method = (snpcoding) GLOBAL.genetics.method;
   SEXP Ans;
-  PROTECT(Ans = createSNPmatrix(snps, individuals, Haplo));// Shuffle==Haplo braucht
-  //                einen Tick mehr Speicher als TwoBit, da letzteres auf 64 Bit
-  //                laeuft und Shuffle/Haplo auf 128 Bit.
-  
+  PROTECT(Ans = createSNPmatrix(snps, individuals, Haplo));
   //   printf("D\n");
   
- Uint *ans = (Uint*) DoAlign(Ans, ALIGN_COMPUTE, Haplo); 
+  Uint *ans =  Align256(Ans, ALIGN_COMPUTE); 
  // printf("E\n");
   IcomputeSNPS(population, Generation, Sex, Nr, INTEGER(From_SNP)[0],
-	       INTEGER(To_SNP)[0], Select, (BlockType0*) ans);
-  // printf("F\n");
+	       INTEGER(To_SNP)[0], Select, ans);
+  //  printf("F m=%d\n", method);
  
   if (geno) {
     //  printf("geno\n");
-   if (method == Shuffle) {
-      Uint *ansG = (Uint*) DoAlign(Ans, ALIGN_COMPUTE, method);
-      assert(ansG == ans);
-      haplo2geno(ans, snps, individuals, method, unitsPerIndiv, ansG);
-      ReUseAs(Ans, method);
-      Uint *info = GetInfo(Ans);
-      Ulong sumgeno = sumGeno(ans, snps, individuals, method);
-      StoreSumGeno(sumgeno);
-    } else {
-      //    HELPINFO("Not using 'Shuffle' as snp coding needs more memory and time.");
-     //    printf("haplo\n");
-     SEXP h = haplo2geno(Ans); // no PROTECT( needed
-     //printf(" ende\n");
-     UNPROTECT(1);
-     return h;
-    }
+    if (!is256(method)) ERR("unallowed snp coding method found");
+      assert(ans == Align256(Ans, ALIGN_COMPUTE));
+      haplo2geno(Ans, ans, method);
   }
+  // printf("F m done =%d\n", method);
 
-  if (PRESERVE) R_PreserveObject(Ans);
-  //  printf("END\n");
- 
-  UNPROTECT(1);
+  UNPROTECT(2);
   return Ans;
  }
 
 
 
-SEXP IsolveRelMat(Uint individuals, double *Atau, double tau,
-		  double *Vec, double beta, bool matrix) {
-  const char *info[3] = {"rest", "yhat", "rel.matrix"};
-  double
-     *A = NULL,
-    *pA = NULL;
-
-  if (tau <= 0) ERR("'tau' must be positive");
-
-  Uint elmts = 2 + matrix,
-    iP1 = individuals + 1,
-    i2 = individuals * individuals;
-  SEXP Ans, namevec;
-  PROTECT(Ans = allocVector(VECSXP, elmts));
-  PROTECT(namevec = allocVector(STRSXP, elmts));
-  setAttrib(Ans, R_NamesSymbol, namevec);
-  for (Uint k=0; k<elmts; k++) SET_STRING_ELT(namevec, k, mkChar(info[k]));
- 
-  if (matrix) {
-    SEXP RA;
-    PROTECT(RA = allocMatrix(REALSXP, individuals, individuals));
-    SET_VECTOR_ELT(Ans, 2, RA);
-    MEMCOPY(REAL(RA), Atau, sizeof(double) * i2);
-    pA = REAL(RA);
-  } else {
-    A =(double *) MALLOC(sizeof(double) * i2),
-    MEMCOPY(A, Atau, sizeof(double) * i2);
-    pA = A;
-  }
-  for (Uint i=0; i<i2; i+=iP1) Atau[i] += tau;
-
-  SEXP rest, yhat;
-  PROTECT(rest = allocVector(REALSXP, individuals));
-  SET_VECTOR_ELT(Ans, 0, rest);
-  double *r = REAL(rest);
-  MEMCOPY(r, Vec, sizeof(double) * individuals);
-  Rint err = Ext_solvePosDef(Atau, individuals, true, r, 1, NULL, NULL);
-  if (err != NOERROR) {
-    errorstring_type errorstring;
-    Ext_getErrorString(errorstring);
-    ERR1("error occurred when solving the system (%.50s)", errorstring);
-  }
-  PROTECT(yhat = allocVector(REALSXP, individuals));
-  SET_VECTOR_ELT(Ans, 1, yhat);
-  double *y = REAL(yhat);
-  xA(r, pA, individuals, individuals, y);
-  FREE(A);
-  for (Uint i=0; i<individuals; y[i++] += beta);
-  UNPROTECT(4 + matrix);
-  if (PRESERVE) R_PreserveObject(Ans);
-   
-  return(Ans);
-}
-
-
 SEXP compute(SEXP popul, SEXP Generation, SEXP Sex, SEXP Nr,
 	     SEXP Tau, SEXP Vec, SEXP Betahat,
 	     SEXP Select, SEXP Matrix_return) {
-  assert_MoBPS();
+  assert_MoBPS(); // asserts(is256(method));
   snpcoding method = (snpcoding) GLOBAL.genetics.method;
-  Uint snps = IcomputeSNPS(popul, Generation, Sex, Nr, 1, NA_INTEGER,
-			   Select, NULL),
-    blocks = Blocks(snps),
+  SEXP Popinfo;
+  PROTECT(Popinfo = IcomputeSNPS(popul, Generation, Sex, Nr, 1, NA_INTEGER,
+				 Select, NULL));
+
+  Uint *popinfo = (Uint*) INTEGER(Popinfo),
+    snps = popinfo[CURRENT_SNPS],
     individuals = length(Generation),
-    unitsPerIndiv = blocks * UnitsPerBlock;
-  Ulong mem = blocks * individuals * UnitsPerBlock + UnitsPerBlock - 1;
-  Rint *G = (Rint *) CALLOC(mem, BytesPerUnit);
+    unitsPerIndivHPL = UnitsPerIndiv256(snps);
+  Ulong
+    memInUnits = (Ulong) individuals * unitsPerIndivHPL,
+    mem = calculateAlignedMem(memInUnits, Haplo, 0);
+  Uint *G = (Uint *) CALLOC(mem, BytesPerUnit);
   if (G == NULL) ERR1("mem allocation (%lu bytes)", mem * BytesPerUnit);
-  Uint *g = (Uint*) algn(G),
-    *g0 = g,
-    n_protect = 0;
+
+  Uint *g = (Uint*) algn_general(G, BytesPerBlock256);
   if ((Uint) length(Vec) != individuals) ERR("'vec' not of correct length");
 
-  IcomputeSNPS(popul, Generation, Sex, Nr,
-	       1, NA_INTEGER, // R coded indices !!
-	       Select, (BlockType0 *) g);
+  IcomputeSNPS(popul, Generation, Sex, Nr, 1, NA_INTEGER, // R coded indices !!
+	       Select, g);
+  haplo2geno(g, snps, individuals, method, unitsPerIndivHPL, g);
 
-
-  if (method != Shuffle) {
-    //    printf("method = %d\n", method);
-    //  HELPINFO("Not using 'Shuffle' or 'TwoBit' coding needs more memory.");
-    SEXP G0;
-    PROTECT(G0 = createSNPmatrix(snps, individuals, method));
-    n_protect++;
-    g0 = (Uint*) DoAlign(G0, ALIGN_COMPUTE, method); 
-  }
-  haplo2geno(g, snps, individuals, method, unitsPerIndiv, g0);
-  // printf("g0 ");for (int i=0; i<10; i++) printf("%d ", g0[i]); printf("\n\n\n");
   
-  double *A = matrix_mult(g0, // no PROTECT( needed;
+  double *A = crossprod(G, // no PROTECT( needed;
 			  snps, individuals, method, true, true, 0);
   
   FREE(G);
 
   SEXP Ans = IsolveRelMat(individuals, A, REAL(Tau)[0], // no PROTECT( needed;
 			  REAL(Vec),
-			  REAL(Betahat)[0], LOGICAL(Matrix_return)[0]);
+			  REAL(Betahat)[0],
+			  2 + (int) LOGICAL(Matrix_return)[0],
+			  true);
   FREE(A);
-  if (n_protect > 0) UNPROTECT(n_protect);
-
+  UNPROTECT(1);
   return Ans;
 }
 
-
-SEXP solveRelMat(SEXP A, SEXP Tau, SEXP Vec, SEXP Beta, SEXP Destroy) {
-  assert_MoBPS();
-  Uint individuals = nrows(A),
-      bytes = individuals * individuals * sizeof(double);
-  bool destroy = LOGICAL(Destroy)[0];
-  double *a = NULL;
-
-  if (!destroy) {
-    a = (double *) MALLOC(bytes);
-    MEMCOPY(a, REAL(A), bytes);
-  }
-  SEXP Ans = IsolveRelMat(individuals, destroy ? REAL(A) : a,//no PROTECT( needd
-			  REAL(Tau)[0], REAL(Vec), REAL(Beta)[0], false);
-  FREE(a);
-
-  return Ans;
-}

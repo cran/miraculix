@@ -21,11 +21,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 
-#include <R.h>
-#include <Rinternals.h>
-#include "kleinkram.h"
+//#include <R.h>
+//#include <Rinternals.h>
 #include "miraculix.h"
 #include <General_utils.h>
+#include "dummy.h"
+#include "MX.h"
+#include "xport_import.h"
 
 
 #define MULTIPLY				\
@@ -230,4 +232,107 @@ SEXP vector012matrix(SEXP vector, SEXP matrix) {
   }
   UNPROTECT(1);
   return ans;
+}
+
+
+
+SEXP IsolveRelMat(Uint individuals, double *Aorig, double tau,
+		  double *Vec, double beta, Uint returns, bool destroy) {
+  // returns: number of return values; could be 3,2,1
+  // if more than 1 element is returned, a list is returned
+  if (tau <= 0) ERR("'tau' must be positive");
+  const char *info[3] = {"rest", "yhat", "rel.matrix"};
+  double
+     *X = NULL,
+    *pA = NULL,
+    *pAtau = NULL;
+
+  Uint
+    protects = 0,
+    iP1 = individuals + 1,
+    i2 = individuals * individuals;
+  SEXP yhat=R_NilValue,
+    Ans=R_NilValue,
+    rest, RA = R_NilValue;
+  PROTECT(rest = allocVector(REALSXP, individuals));
+  protects++;
+  double *r = REAL(rest);
+  MEMCOPY(r, Vec, sizeof(double) * individuals);
+
+  if (returns == 1) { // only "rest" is returned
+    if (destroy) pAtau = Aorig;
+    else {
+      X =(double *) MALLOC(sizeof(double) * i2);
+      MEMCOPY(X, Aorig, sizeof(double) * i2);
+      pAtau = X;     
+    }
+    
+  } else { // at least "rest" and "yhat" are returned
+    SEXP namevec;
+    PROTECT(Ans = allocVector(VECSXP, returns));
+    protects++;
+    PROTECT(namevec = allocVector(STRSXP, returns));
+    protects++;
+    for (Uint k=0; k<returns; k++) SET_STRING_ELT(namevec, k, mkChar(info[k]));
+    setAttrib(Ans, R_NamesSymbol, namevec);
+    SET_VECTOR_ELT(Ans, 0, rest);
+    PROTECT(yhat = allocVector(REALSXP, individuals));
+    protects++;
+    SET_VECTOR_ELT(Ans, 1, yhat);
+  
+    if (returns == 2) {
+      X = (double *) MALLOC(sizeof(double) * i2);
+      MEMCOPY(X, Aorig, sizeof(double) * i2);
+      pAtau = X;
+      pA = Aorig;
+    }
+
+    else if (returns == 3) {
+      PROTECT(RA = allocMatrix(REALSXP, individuals, individuals));
+      protects++;
+      SET_VECTOR_ELT(Ans, 2, RA);
+      MEMCOPY(REAL(RA), Aorig, sizeof(double) * i2);
+      if (destroy) {
+	pAtau = Aorig;
+	pA = REAL(RA);
+      } else {
+	pAtau = REAL(RA);
+	pA = Aorig;
+      }
+    }
+
+    else BUG;
+  }
+  
+  for (Uint i=0; i<i2; i+=iP1) pAtau[i] += tau;
+  Rint err = Ext_solvePosDef(pAtau, individuals, true, r, 1, NULL, NULL);
+  FREE(X);
+  if (err != NOERROR) {
+    errorstring_type errorstring;
+    Ext_getErrorString(errorstring);
+    ERR1("error occurred when solving the system (%.50s)", errorstring);
+  }
+  if (returns == 1) {
+    UNPROTECT(protects);
+    return rest;
+  }
+  
+  double *y = REAL(yhat);
+  xA(r, pA, individuals, individuals, y); 
+  for (Uint i=0; i<individuals; y[i++] += beta);  // ok
+
+  if (returns == 3 && !destroy) MEMCOPY(REAL(RA), Aorig, sizeof(double) * i2);
+  
+  UNPROTECT(protects);
+  return Ans;
+}
+
+
+  SEXP solveRelMat(SEXP A, SEXP Tau, SEXP Vec, SEXP Beta, SEXP Destroy) {
+  Uint individuals = nrows(A);
+  bool yhat = Beta != R_NilValue;
+  return IsolveRelMat(individuals, REAL(A),//no PROTECT( needd
+		      REAL(Tau)[0], REAL(Vec),
+		      yhat ? REAL(Beta)[0] : 0.0,
+		      1L + (Uint) yhat, LOGICAL(Destroy)[0]);
 }
