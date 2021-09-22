@@ -21,10 +21,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 
-//#include <R.h>
-//#include <Rinternals.h>
-#include "miraculix.h"
+#include <inttypes.h>
+#include <Basic_utils.h>
 #include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
+#include "miraculix.h"
 #include "dummy.h"
 #include "MX.h"
 #include "xport_import.h"

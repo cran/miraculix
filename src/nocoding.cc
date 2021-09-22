@@ -25,11 +25,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define UNCOMPRESSED 1
 #define MY_METHOD NoSNPcoding
 
-//#include <stdio.h>
-//#include "options.h"
-#include "AutoMiraculix.h"
+#include <inttypes.h>
+#include <Basic_utils.h>
 #include "intrinsics.h"
 #include <General_utils.h>
+#include "AutoMiraculix.h"
 #include "dummy.h"
 #include "align.h"
 #include "haplogeno.h"

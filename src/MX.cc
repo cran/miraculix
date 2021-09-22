@@ -25,12 +25,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <R.h>
 #include <Rinternals.h>
 #include <inttypes.h> 
-//#include <Rdefines.h>
+#include <Basic_utils.h>
+#include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
 #include "AutoMiraculix.h"
 #include "MX.h"
-#include <General_utils.h>
 #include "dummy.h"
-#include <zzz_RandomFieldsUtils.h>
 #include "dummy.h"
 #include "options.h"
 

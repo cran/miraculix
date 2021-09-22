@@ -24,8 +24,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 
-#include <R.h>
+#include <inttypes.h>
+#include <Basic_utils.h>
 #include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
 #include "dummy.h"
 #include "miraculix.h"
 #include "xport_import.h"

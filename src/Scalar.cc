@@ -32,10 +32,13 @@ PKG_CXXFLAGS =  $(SHLIB_OPENMP_CXXFLAGS)  -march=native -mssse3
  */
 
 
-#include "Scalar.h"
-#include <General_utils.h>
-#include "dummy.h"
+#include <inttypes.h>
+#include <Basic_utils.h>
 #include "intrinsics.h"
+#include <General_utils.h>
+
+#include "Scalar.h"
+#include "dummy.h"
 #include "miraculix.h"
 
 

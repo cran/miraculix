@@ -25,18 +25,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_MX_H
 #define miraculix_MX_H 1
 
-
-// 1
-
-//#include "miraculix.h"
-//#include "AutoMiraculix.h"
-//#include "intrinsics.h"
-// include liste nicht erweitern, sondern stattdessen haplogeno.h verwenden
-
-#include <R.h>
-#include <Rinternals.h>
-#include <inttypes.h>
 #include "AutoMiraculix.h"
+#ifdef Ulong
+#undef Ulong
+#endif
+#ifdef Long
+#undef Long
+#endif
 
 
 typedef int Rint;

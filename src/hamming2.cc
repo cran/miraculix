@@ -44,8 +44,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 
-#include "miraculix.h"
+#include <inttypes.h>
+#include <Basic_utils.h>
+#include "intrinsics.h"
 #include <General_utils.h>
+#include "miraculix.h"
 #include "dummy.h"
 #include "haplogeno.h"
 #include "hamming.intern.h"

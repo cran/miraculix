@@ -24,6 +24,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // gcc -mavx -o hello_avx hello_avx.c
 
+#include <inttypes.h>
+#include <Basic_utils.h>
+#include "intrinsics.h"
+#include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
 #include "Bit23.intern.h"
 
 

@@ -24,10 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_main_H
 #define miraculix_main_H 1
 
-//
-#include <R.h>
-#include <Rinternals.h>
-#include <Rdefines.h>
 
 #ifdef __cplusplus
 extern "C" {

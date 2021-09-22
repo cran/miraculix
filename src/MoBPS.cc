@@ -26,12 +26,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define BitsPerCode 2L
 #define PlainInteger256
 
+#include <inttypes.h>
+#include <Basic_utils.h>
 #include "intrinsics.h"
-#include "miraculix.h"
 #include <General_utils.h>
-#include "dummy.h"
+#include <zzz_RandomFieldsUtils.h>
 
-#include <inttypes.h> 
+#include "miraculix.h"
+#include "dummy.h"
 #include "Vector.matrix.h"
 #include "AutoMiraculix.h"
 #include "options.h"

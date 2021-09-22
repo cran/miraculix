@@ -26,6 +26,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define MY_METHOD TwoBit
 
+#include <stdio.h>
+#ifdef DO_PARALLEL
+#include <omp.h>
+#endif
+
+#include <inttypes.h>
+#include <Basic_utils.h>
+#include "intrinsics.h"
+#include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
 #include "2bit.h"
 #include "Bit23.intern.h"
 #include "haplogeno.h"

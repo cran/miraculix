@@ -25,13 +25,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_Bit23intern_H
 #define miraculix_Bit23intern_H 1
 
-#include <stdio.h>
-#ifdef DO_PARALLEL
-#include <omp.h>
-#endif
-
-#include "intrinsics.h"
-//#include "haplogeno.h"
 #include "options.h"
 #include "error.h"
 #include "MX.h"

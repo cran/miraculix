@@ -23,8 +23,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // _MM_ALIGN16 Uint ccc;
 
-#include "AutoMiraculix.h"
+#include <inttypes.h>
+#include <Basic_utils.h>
+#include <Rdefines.h>
 #include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
+
+#include "AutoMiraculix.h"
 #include "dummy.h"
 #include "xport_import.h"
 #include "Haplo.h"

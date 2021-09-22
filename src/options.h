@@ -25,8 +25,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_options_H
 #define miraculix_options_H 1
 
-#include <Rinternals.h>
-#include <Basic_utils.h>
 #include "AutoMiraculix.h"
 
 #define geneticsN 6

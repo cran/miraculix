@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_initrinsics_H
 #define miraculix_initrinsics_H 1
 
-#include <inttypes.h>
+//#include <inttypes.h>
 #include "MX.h"
 
 // PKG_CXXFLAGS =  $(SHLIB_OPENMP_CXXFLAGS) -mavx -msse -msse2 -msse3 -msse4 -msse4a -march=core-avx2

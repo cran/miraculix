@@ -24,6 +24,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define MY_METHOD Packed
 
 #include "IntrinsicsBase.h"
+#include <inttypes.h>
+#include <Basic_utils.h>
+#include "intrinsics.h"
+#include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
 
 #include "error.h"
 #include "MX.h"

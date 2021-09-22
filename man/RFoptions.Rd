@@ -165,9 +165,7 @@
  arguments, otherwise.
 }
 
-%\references{}
-\author{Martin Schlather, \email{schlather@math.uni-mannheim.de}
- \url{http://ms.math.uni-mannheim.de/de/publications/software}}
+\me
 
 \seealso{
 \code{\link[RandomFieldsUtils]{RFoptions}},

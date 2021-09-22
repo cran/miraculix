@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef miraculix_haplogeno_H
 #define miraculix_haplogeno_H 1
 
-#include <inttypes.h>
 #include "miraculix.h"
 #include "AutoMiraculix.h"
 // #include "IntrinsicsBase.h" --- darf nicht rein !!!

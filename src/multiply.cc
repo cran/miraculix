@@ -23,7 +23,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define MY_METHOD Multiply
 
+#include <inttypes.h>
 #include "IntrinsicsBase.h"
+#include <Basic_utils.h>
+#include <General_utils.h>
+#include <zzz_RandomFieldsUtils.h>
 #include "error.h"
 #include "MX.h"
 #include "options.h"
